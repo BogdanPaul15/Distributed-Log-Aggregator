@@ -1,0 +1,46 @@
+{
+  "realm": "log-realm",
+  "enabled": true,
+  "users": [
+    {
+      "username": "testuser",
+      "enabled": true,
+      "email": "test@example.com",
+      "firstName": "Test",
+      "lastName": "User",
+      "credentials": [{"type": "password", "value": "test"}],
+      "realmRoles": ["developer"]
+    },
+    {
+      "username": "viewer",
+      "enabled": true,
+      "email": "viewer@example.com",
+      "firstName": "Viewer",
+      "lastName": "User",
+      "credentials": [{"type": "password", "value": "viewer"}],
+      "realmRoles": ["viewer"]
+    }
+  ],
+  "roles": {
+    "realm": [
+      {"name": "admin", "description": "Administrator"},
+      {"name": "developer", "description": "Developer"},
+      {"name": "viewer", "description": "Viewer"}
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "log-client",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "secret",
+      "directAccessGrantsEnabled": true,
+      "standardFlowEnabled": true,
+      "redirectUris": [
+        "http://localhost:8000/*",
+        "http://localhost:8000/"
+      ],
+      "webOrigins": ["*"]
+    }
+  ]
+}

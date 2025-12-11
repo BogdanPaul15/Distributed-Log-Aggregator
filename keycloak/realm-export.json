@@ -3,13 +3,13 @@
   "enabled": true,
   "users": [
     {
-      "username": "testuser",
+      "username": "admin",
       "enabled": true,
-      "email": "test@example.com",
-      "firstName": "Test",
+      "email": "admin@example.com",
+      "firstName": "Admin",
       "lastName": "User",
-      "credentials": [{"type": "password", "value": "test"}],
-      "realmRoles": ["developer"]
+      "credentials": [{"type": "password", "value": "admin"}],
+      "realmRoles": ["admin"]
     },
     {
       "username": "viewer",
@@ -19,6 +19,15 @@
       "lastName": "User",
       "credentials": [{"type": "password", "value": "viewer"}],
       "realmRoles": ["viewer"]
+    },
+    {
+      "username": "developer",
+      "enabled": true,
+      "email": "developer@example.com",
+      "firstName": "Developer",
+      "lastName": "User",
+      "credentials": [{"type": "password", "value": "developer"}],
+      "realmRoles": ["developer"]
     }
   ],
   "roles": {

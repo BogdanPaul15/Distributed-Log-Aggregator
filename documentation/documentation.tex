@@ -1,0 +1,161 @@
+\documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{longtable}
+\usepackage{booktabs}
+\usepackage{amssymb}
+\usepackage{graphicx}
+
+\geometry{a4paper, margin=1in}
+
+\title{Distributed Log Aggregator - Milestone 2 Documentation}
+\author{Prisacaru Bogdan-Paul, 343C4}
+\date{\today}
+
+\definecolor{codegray}{rgb}{0.95,0.95,0.95}
+\lstset{
+    backgroundcolor=\color{codegray},
+    basicstyle=\ttfamily\small,
+    breaklines=true,
+    frame=single,
+    columns=fullflexible
+}
+
+\begin{document}
+
+\maketitle
+
+\section{Overview}
+The \textbf{Distributed Log Aggregator} is a scalable, microservices-based log aggregation and analytics platform. It is built using \textbf{Docker Swarm}, \textbf{FastAPI}, \textbf{Keycloak}, and \textbf{OpenSearch}.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth]{scd_M2.png}
+    \caption{Milestone 2 System Architecture Overview}
+    \label{fig:architecture}
+\end{figure}
+
+\section{Architecture}
+The system is composed of the following microservices:
+
+\begin{itemize}
+    \item \textbf{Dashboard Service}: A FastAPI-based frontend and API providing a user interface for log visualization, filtering, and exporting. It handles authentication via Keycloak.
+    \item \textbf{Ingestor Service}: A lightweight service dedicated to receiving logs from various sources and indexing them into OpenSearch.
+    \item \textbf{Log Generator}: A utility service that generates mock log traffic to simulate a real-world distributed system.
+    \item \textbf{OpenSearch}: The core search and analytics engine used to store and query logs.
+    \item \textbf{Keycloak}: Handles Identity and Access Management (IAM) and Single Sign-On (SSO).
+    \item \textbf{PostgreSQL}: Stores user profile data and application-specific metadata.
+\end{itemize}
+
+\section{Key Features}
+
+\subsection{Authentication}
+\begin{itemize}
+    \item \textbf{Single Sign-On (SSO)}: Powered by Keycloak (OpenID Connect).
+\end{itemize}
+
+\subsection{Role-Based Access Control (RBAC)}
+The system implements secure access management with distinct roles. The permissions are defined as follows:
+
+\begin{center}
+\begin{tabular}{lccc}
+\toprule
+\textbf{Feature} & \textbf{Admin} & \textbf{Developer} & \textbf{Viewer} \\
+\midrule
+Login via SSO & $\checkmark$ & $\checkmark$ & $\checkmark$ \\
+Search \& Filter & $\checkmark$ & $\checkmark$ & $\checkmark$ \\
+Time Window & Unlimited & Unlimited & Last 3 Hours \\
+Log Visibility & All Levels & All Levels & INFO/WARN Only \\
+Export Data & $\checkmark$ & $\checkmark$ & $\times$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Advanced Filtering \& Search}
+\begin{itemize}
+    \item \textbf{Full-Text Search}: Search log messages using OpenSearch.
+    \item \textbf{Structured Filters}: Filter by \textbf{Service}, \textbf{Log Level}, and \textbf{Time Range}.
+    \item \textbf{Pagination}: Efficiently browse through logs.
+\end{itemize}
+
+\subsection{Data Export}
+\begin{itemize}
+    \item Export filtered logs to \textbf{CSV} or \textbf{JSON} formats.
+    \item The export functionality respects active filters (e.g., filtering for "ERROR" results in an export containing only errors).
+\end{itemize}
+
+\subsection{Scalable Ingestion}
+\begin{itemize}
+    \item Implements a time-based indexing strategy (\texttt{app-logs-YYYY.MM.DD}) for efficient storage management.
+\end{itemize}
+
+\section{Setup \& Deployment}
+
+\subsection{Prerequisites}
+\begin{itemize}
+    \item Docker \& Docker Compose
+    \item Docker Swarm initialized (\texttt{docker swarm init})
+\end{itemize}
+
+\subsection{Deployment Steps}
+\begin{enumerate}
+    \item \textbf{Build the Services}:
+    \begin{lstlisting}[language=bash]
+docker compose build
+    \end{lstlisting}
+
+    \item \textbf{Deploy the Stack}:
+    \begin{lstlisting}[language=bash]
+docker stack deploy -c docker-compose.yml log_stack
+    \end{lstlisting}
+
+    \item \textbf{Access the Dashboard}:
+    Open \url{http://localhost:8000} in your browser.
+
+    \item \textbf{Access Keycloak Console}:
+    Open \url{http://localhost:8080}.
+\end{enumerate}
+
+\section{Default Credentials}
+
+\subsection{Application Users (Log Realm)}
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+\textbf{Role} & \textbf{Username} & \textbf{Password} \\
+\midrule
+\textbf{Admin} & \texttt{admin} & \texttt{admin} \\
+\textbf{Developer} & \texttt{developer} & \texttt{developer} \\
+\textbf{Viewer} & \texttt{viewer} & \texttt{viewer} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Keycloak Administration Console}
+\begin{itemize}
+    \item \textbf{URL}: \url{http://localhost:8080}
+    \item \textbf{Username}: \texttt{admin}
+    \item \textbf{Password}: \texttt{admin}
+\end{itemize}
+
+\section{Testing}
+To generate traffic, ensure the log generator is running:
+\begin{lstlisting}[language=bash]
+docker service scale log_stack_log-generator=1
+\end{lstlisting}
+
+To stop generation:
+\begin{lstlisting}[language=bash]
+docker service scale log_stack_log-generator=0
+\end{lstlisting}
+
+\section{Project Repository}
+The complete source code for this milestone is available on GitHub:
+\begin{center}
+    \url{https://github.com/BogdanPaul15/Distributed-Log-Aggregator}
+\end{center}
+
+\end{document}

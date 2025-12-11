@@ -76,12 +76,45 @@
                 <hr class="mt-4 mb-4">
                 {% endif %}
 
-                <h3 class="mb-3">Live Logs</h3>
-                
-                <div class="input-group mb-3">
-                    <span class="input-group-text">Search</span>
-                    <input type="text" class="form-control" id="searchInput" placeholder="Filter by service, level, or message..." onkeyup="filterLogs()">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h3>Live Logs</h3>
+                    {% if role != 'viewer' %}
+                    <div class="btn-group">
+                        <a href="/export?format=csv&q={{ q or '' }}&service={{ service or '' }}&level={{ level or '' }}&start_time={{ start_time or '' }}&end_time={{ end_time or '' }}" class="btn btn-outline-primary btn-sm">Export CSV</a>
+                        <a href="/export?format=json&q={{ q or '' }}&service={{ service or '' }}&level={{ level or '' }}&start_time={{ start_time or '' }}&end_time={{ end_time or '' }}" class="btn btn-outline-secondary btn-sm">Export JSON</a>
+                    </div>
+                    {% endif %}
                 </div>
+                
+                <form method="get" action="/" class="mb-4">
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <input type="text" name="q" class="form-control" placeholder="Search message..." value="{{ q or '' }}">
+                        </div>
+                        <div class="col-md-2">
+                            <input type="text" name="service" class="form-control" placeholder="Service" value="{{ service or '' }}">
+                        </div>
+                        <div class="col-md-2">
+                            <select name="level" class="form-select">
+                                <option value="">All Levels</option>
+                                <option value="INFO" {% if level == 'INFO' %}selected{% endif %}>INFO</option>
+                                <option value="WARN" {% if level == 'WARN' %}selected{% endif %}>WARN</option>
+                                <option value="ERROR" {% if level == 'ERROR' %}selected{% endif %}>ERROR</option>
+                                <option value="DEBUG" {% if level == 'DEBUG' %}selected{% endif %}>DEBUG</option>
+                                <option value="FATAL" {% if level == 'FATAL' %}selected{% endif %}>FATAL</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <input type="datetime-local" name="start_time" class="form-control" value="{{ start_time or '' }}" title="Start Time">
+                        </div>
+                        <div class="col-md-2">
+                            <input type="datetime-local" name="end_time" class="form-control" value="{{ end_time or '' }}" title="End Time">
+                        </div>
+                        <div class="col-md-1">
+                            <button type="submit" class="btn btn-primary w-100">Filter</button>
+                        </div>
+                    </div>
+                </form>
 
                 <div class="table-responsive">
                     <table class="table table-hover table-bordered" id="logTable">
@@ -112,9 +145,28 @@
                             {% endfor %}
                         </tbody>
                     </table>
-                    <div id="noResults" class="text-center p-4 text-muted" style="display: none;">
+                    
+                    {% if not logs %}
+                    <div class="text-center p-4 text-muted">
                         No logs found matching your criteria.
                     </div>
+                    {% endif %}
+
+                    {% if total_pages > 1 %}
+                    <nav aria-label="Page navigation" class="mt-4">
+                        <ul class="pagination justify-content-center">
+                            <li class="page-item {% if page <= 1 %}disabled{% endif %}">
+                                <a class="page-link" href="/?page={{ page - 1 }}&q={{ q or '' }}&service={{ service or '' }}&level={{ level or '' }}&start_time={{ start_time or '' }}&end_time={{ end_time or '' }}">Previous</a>
+                            </li>
+                            <li class="page-item disabled">
+                                <span class="page-link">Page {{ page }} of {{ total_pages }} ({{ total_hits }} logs)</span>
+                            </li>
+                            <li class="page-item {% if page >= total_pages %}disabled{% endif %}">
+                                <a class="page-link" href="/?page={{ page + 1 }}&q={{ q or '' }}&service={{ service or '' }}&level={{ level or '' }}&start_time={{ start_time or '' }}&end_time={{ end_time or '' }}">Next</a>
+                            </li>
+                        </ul>
+                    </nav>
+                    {% endif %}
                 </div>
 
             </div>
@@ -144,26 +196,5 @@
         </div>
         {% endif %}
     </div>
-
-    <script>
-        function filterLogs() {
-            var input = document.getElementById("searchInput");
-            var filter = input.value.toUpperCase();
-            var table = document.getElementById("logTable");
-            var tr = table.getElementsByTagName("tr");
-            var hasVisibleRows = false;
-            for (var i = 1; i < tr.length; i++) {
-                var row = tr[i];
-                var textContent = row.textContent || row.innerText;
-                if (textContent.toUpperCase().indexOf(filter) > -1) {
-                    row.style.display = "";
-                    hasVisibleRows = true;
-                } else {
-                    row.style.display = "none";
-                }
-            }
-            document.getElementById("noResults").style.display = hasVisibleRows ? "none" : "block";
-        }
-    </script>
 </body>
 </html>

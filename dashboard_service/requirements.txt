@@ -6,3 +6,4 @@ python-jose
 jinja2
 requests
 python-multipart
+opensearch-py

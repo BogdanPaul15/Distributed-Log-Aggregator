@@ -76,10 +76,10 @@ def get_logs(role: str, page: int = 1, size: int = 10, search_query: str = None,
         })
 
     if service:
-        must_conditions.append({"term": {"service.keyword": service}})
+        must_conditions.append({"term": {"service": service}})
         
     if level:
-        must_conditions.append({"term": {"level.keyword": level}})
+        must_conditions.append({"term": {"level": level}})
 
     timestamp_range = {}
     if start_time:
@@ -88,7 +88,7 @@ def get_logs(role: str, page: int = 1, size: int = 10, search_query: str = None,
         timestamp_range["lte"] = end_time
         
     if role == 'viewer':
-        must_conditions.append({"terms": {"level.keyword": ["INFO", "WARN"]}})
+        must_conditions.append({"terms": {"level": ["INFO", "WARN"]}})
         # Viewer is restricted to last 3 hours. 
         # If user provides a start_time, it must be within the last 3 hours.
         # We can just add another range condition, OpenSearch will intersect them.

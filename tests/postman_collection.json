@@ -1,0 +1,846 @@
+{
+	"info": {
+		"_postman_id": "distributed-log-aggregator-comprehensive",
+		"name": "Distributed Log Aggregator",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "1. Login Failure (Keycloak API)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 401\", function () {",
+							"    pm.response.to.have.status(401);",
+							"});",
+							"pm.test(\"Error is unauthorized\", function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData.error).to.eql(\"invalid_grant\");",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "urlencoded",
+					"urlencoded": [
+						{
+							"key": "client_id",
+							"value": "log-client",
+							"type": "text"
+						},
+						{
+							"key": "client_secret",
+							"value": "secret",
+							"type": "text"
+						},
+						{
+							"key": "username",
+							"value": "admin",
+							"type": "text"
+						},
+						{
+							"key": "password",
+							"value": "wrongpassword",
+							"type": "text"
+						},
+						{
+							"key": "grant_type",
+							"value": "password",
+							"type": "text"
+						}
+					]
+				},
+				"url": {
+					"raw": "{{keycloak_token_url}}",
+					"host": [
+						"{{keycloak_token_url}}"
+					]
+				}
+			}
+		},
+		{
+			"name": "2. Login Admin (Keycloak API)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"var jsonData = pm.response.json();",
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"if (jsonData.access_token) {",
+							"    pm.collectionVariables.set(\"access_token\", jsonData.access_token);",
+							"    pm.collectionVariables.set(\"id_token\", jsonData.id_token);",
+							"}"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "urlencoded",
+					"urlencoded": [
+						{
+							"key": "client_id",
+							"value": "log-client",
+							"type": "text"
+						},
+						{
+							"key": "client_secret",
+							"value": "secret",
+							"type": "text"
+						},
+						{
+							"key": "username",
+							"value": "admin",
+							"type": "text"
+						},
+						{
+							"key": "password",
+							"value": "admin",
+							"type": "text"
+						},
+						{
+							"key": "grant_type",
+							"value": "password",
+							"type": "text"
+						}
+					]
+				},
+				"url": {
+					"raw": "{{keycloak_token_url}}",
+					"host": [
+						"{{keycloak_token_url}}"
+					]
+				}
+			}
+		},
+		{
+			"name": "3. Verify Admin Dashboard Access",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"pm.test(\"Welcome Admin\", function () {",
+							"    pm.expect(pm.response.text()).to.include(\"Welcome, <strong>admin</strong>\");",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Cookie",
+						"value": "access_token={{access_token}}; id_token={{id_token}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{base_url}}/",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						""
+					]
+				}
+			}
+		},
+		{
+			"name": "4. Export Logs (Admin)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Cookie",
+						"value": "access_token={{access_token}}; id_token={{id_token}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{base_url}}/export",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"export"
+					]
+				}
+			}
+		},
+		{
+			"name": "5. Logout Admin",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"pm.collectionVariables.unset(\"access_token\");",
+							"pm.collectionVariables.unset(\"id_token\");"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/logout",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"logout"
+					]
+				}
+			}
+		},
+		{
+			"name": "6. Login Viewer (Keycloak API)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"var jsonData = pm.response.json();",
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"if (jsonData.access_token) {",
+							"    pm.collectionVariables.set(\"access_token\", jsonData.access_token);",
+							"    pm.collectionVariables.set(\"id_token\", jsonData.id_token);",
+							"}"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "urlencoded",
+					"urlencoded": [
+						{
+							"key": "client_id",
+							"value": "log-client",
+							"type": "text"
+						},
+						{
+							"key": "client_secret",
+							"value": "secret",
+							"type": "text"
+						},
+						{
+							"key": "username",
+							"value": "viewer",
+							"type": "text"
+						},
+						{
+							"key": "password",
+							"value": "viewer",
+							"type": "text"
+						},
+						{
+							"key": "grant_type",
+							"value": "password",
+							"type": "text"
+						}
+					]
+				},
+				"url": {
+					"raw": "{{keycloak_token_url}}",
+					"host": [
+						"{{keycloak_token_url}}"
+					]
+				}
+			}
+		},
+		{
+			"name": "7. Verify Viewer Dashboard Access",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"pm.test(\"Welcome Viewer\", function () {",
+							"    pm.expect(pm.response.text()).to.include(\"Welcome, <strong>viewer</strong>\");",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Cookie",
+						"value": "access_token={{access_token}}; id_token={{id_token}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{base_url}}/",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						""
+					]
+				}
+			}
+		},
+		{
+			"name": "8. Export Logs (Viewer - Forbidden)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 403\", function () {",
+							"    pm.response.to.have.status(403);",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Cookie",
+						"value": "access_token={{access_token}}; id_token={{id_token}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{base_url}}/export",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"export"
+					]
+				}
+			}
+		},
+		{
+			"name": "9. Logout Viewer",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"pm.collectionVariables.unset(\"access_token\");",
+							"pm.collectionVariables.unset(\"id_token\");"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/logout",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"logout"
+					]
+				}
+			}
+		},
+		{
+			"name": "10. Login Developer (Keycloak API)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"var jsonData = pm.response.json();",
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"if (jsonData.access_token) {",
+							"    pm.collectionVariables.set(\"access_token\", jsonData.access_token);",
+							"    pm.collectionVariables.set(\"id_token\", jsonData.id_token);",
+							"}"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "urlencoded",
+					"urlencoded": [
+						{
+							"key": "client_id",
+							"value": "log-client",
+							"type": "text"
+						},
+						{
+							"key": "client_secret",
+							"value": "secret",
+							"type": "text"
+						},
+						{
+							"key": "username",
+							"value": "developer",
+							"type": "text"
+						},
+						{
+							"key": "password",
+							"value": "developer",
+							"type": "text"
+						},
+						{
+							"key": "grant_type",
+							"value": "password",
+							"type": "text"
+						}
+					]
+				},
+				"url": {
+					"raw": "{{keycloak_token_url}}",
+					"host": [
+						"{{keycloak_token_url}}"
+					]
+				}
+			}
+		},
+		{
+			"name": "11. Verify Developer Dashboard Access",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"pm.test(\"Role is developer\", function () {",
+							"    pm.expect(pm.response.text()).to.include(\"text-uppercase\\\">developer</span>\");",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Cookie",
+						"value": "access_token={{access_token}}; id_token={{id_token}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{base_url}}/",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						""
+					]
+				}
+			}
+		},
+		{
+			"name": "12. Ingest Log",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							"pm.collectionVariables.set(\"unique_id\", require('uuid').v4());"
+						],
+						"type": "text/javascript"
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"service\": \"postman-test\",\n    \"level\": \"INFO\",\n    \"message\": \"Postman Comprehensive Test {{unique_id}}\"\n}"
+				},
+				"url": {
+					"raw": "{{ingestor_url}}/ingest",
+					"host": [
+						"{{ingestor_url}}"
+					],
+					"path": [
+						"ingest"
+					]
+				}
+			}
+		},
+		{
+			"name": "13. Logout Developer",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"pm.collectionVariables.unset(\"access_token\");",
+							"pm.collectionVariables.unset(\"id_token\");"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{base_url}}/logout",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"logout"
+					]
+				}
+			}
+		},
+		{
+			"name": "14. Login Admin (Restore Session)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"var jsonData = pm.response.json();",
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"",
+							"if (jsonData.access_token) {",
+							"    pm.collectionVariables.set(\"access_token\", jsonData.access_token);",
+							"    pm.collectionVariables.set(\"id_token\", jsonData.id_token);",
+							"}"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "urlencoded",
+					"urlencoded": [
+						{
+							"key": "client_id",
+							"value": "log-client",
+							"type": "text"
+						},
+						{
+							"key": "client_secret",
+							"value": "secret",
+							"type": "text"
+						},
+						{
+							"key": "username",
+							"value": "admin",
+							"type": "text"
+						},
+						{
+							"key": "password",
+							"value": "admin",
+							"type": "text"
+						},
+						{
+							"key": "grant_type",
+							"value": "password",
+							"type": "text"
+						}
+					]
+				},
+				"url": {
+					"raw": "{{keycloak_token_url}}",
+					"host": [
+						"{{keycloak_token_url}}"
+					]
+				}
+			}
+		},
+		{
+			"name": "15. Search Log (Admin)",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							"// Wait 5 seconds for indexing",
+							"const date = Date.now();",
+							"let currentDate = null;",
+							"do {",
+							"    currentDate = Date.now();",
+							"} while (currentDate - date < 5000);"
+						],
+						"type": "text/javascript"
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"pm.test(\"Log Found\", function () {",
+							"    var uuid = pm.collectionVariables.get(\"unique_id\");",
+							"    pm.expect(pm.response.text()).to.include(uuid);",
+							"    pm.expect(pm.response.text()).to.not.include(\"No logs found matching your criteria\");",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Cookie",
+						"value": "access_token={{access_token}}; id_token={{id_token}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{base_url}}/?q={{unique_id}}",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						""
+					],
+					"query": [
+						{
+							"key": "q",
+							"value": "{{unique_id}}"
+						}
+					]
+				}
+			}
+		},
+		{
+			"name": "16. Ingest Filter Test Log",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							"const now = new Date();",
+							"pm.collectionVariables.set(\"filter_id\", require('uuid').v4());",
+							"pm.collectionVariables.set(\"filter_timestamp\", now.toISOString());",
+							"const start = new Date(now.getTime() - 60000);",
+							"const end = new Date(now.getTime() + 60000);",
+							"pm.collectionVariables.set(\"start_time\", start.toISOString());",
+							"pm.collectionVariables.set(\"end_time\", end.toISOString());"
+						],
+						"type": "text/javascript"
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"service\": \"filter-service\",\n    \"level\": \"WARN\",\n    \"message\": \"Filter Test {{filter_id}}\",\n    \"timestamp\": \"{{filter_timestamp}}\"\n}"
+				},
+				"url": {
+					"raw": "{{ingestor_url}}/ingest",
+					"host": [
+						"{{ingestor_url}}"
+					],
+					"path": [
+						"ingest"
+					]
+				}
+			}
+		},
+		{
+			"name": "17. Search with Filters (Admin)",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							"// Wait 5 seconds for indexing",
+							"const date = Date.now();",
+							"let currentDate = null;",
+							"do {",
+							"    currentDate = Date.now();",
+							"} while (currentDate - date < 5000);"
+						],
+						"type": "text/javascript"
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"pm.test(\"Log Found with Filters\", function () {",
+							"    var uuid = pm.collectionVariables.get(\"filter_id\");",
+							"    pm.expect(pm.response.text()).to.include(uuid);",
+							"    pm.expect(pm.response.text()).to.not.include(\"No logs found matching your criteria\");",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Cookie",
+						"value": "access_token={{access_token}}; id_token={{id_token}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{base_url}}/?q={{filter_id}}&service=filter-service&level=WARN&start_time={{start_time}}&end_time={{end_time}}",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						""
+					],
+					"query": [
+						{
+							"key": "q",
+							"value": "{{filter_id}}"
+						},
+						{
+							"key": "service",
+							"value": "filter-service"
+						},
+						{
+							"key": "level",
+							"value": "WARN"
+						},
+						{
+							"key": "start_time",
+							"value": "{{start_time}}"
+						},
+						{
+							"key": "end_time",
+							"value": "{{end_time}}"
+						}
+					]
+				}
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:8000"
+		},
+		{
+			"key": "ingestor_url",
+			"value": "http://localhost:8001"
+		},
+		{
+			"key": "keycloak_token_url",
+			"value": "http://localhost:8080/realms/log-realm/protocol/openid-connect/token"
+		}
+	]
+}

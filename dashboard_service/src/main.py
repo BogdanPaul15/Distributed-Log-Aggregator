@@ -68,10 +68,23 @@ def get_logs(role: str, page: int = 1, size: int = 10, search_query: str = None,
     
     if search_query:
         must_conditions.append({
-            "multi_match": {
-                "query": search_query,
-                "fields": ["service", "level", "message"],
-                "type": "phrase_prefix"
+            "bool": {
+                "should": [
+                    {
+                        "multi_match": {
+                            "query": search_query,
+                            "fields": ["message"],
+                            "type": "phrase_prefix"
+                        }
+                    },
+                    {
+                        "multi_match": {
+                            "query": search_query,
+                            "fields": ["service", "level"]
+                        }
+                    }
+                ],
+                "minimum_should_match": 1
             }
         })
 
@@ -270,15 +283,26 @@ async def logout(request: Request):
     response.delete_cookie("access_token")
     return response
 
-@app.post("/login", response_class=HTMLResponse)
-async def login(request: Request, username: str = Form(...), password: str = Form(...), db: Session = Depends(database.get_db)):
+@app.get("/login")
+async def login_redirect():
+    public_keycloak_url = KEYCLOAK_URL.replace("http://keycloak:8080", "http://localhost:8080")
+    return RedirectResponse(
+        f"{public_keycloak_url}/protocol/openid-connect/auth"
+        f"?client_id={CLIENT_ID}"
+        f"&response_type=code"
+        f"&redirect_uri={quote(APP_BASE_URL + 'callback')}"
+        f"&scope=openid"
+    )
+
+@app.get("/callback")
+async def callback(request: Request, code: str, db: Session = Depends(database.get_db)):
     token_url = f"{KEYCLOAK_URL}/protocol/openid-connect/token"
     payload = {
+        "grant_type": "authorization_code",
+        "code": code,
+        "redirect_uri": APP_BASE_URL + "callback",
         "client_id": CLIENT_ID,
         "client_secret": CLIENT_SECRET,
-        "username": username,
-        "password": password,
-        "grant_type": "password"
     }
     
     try:
@@ -293,9 +317,8 @@ async def login(request: Request, username: str = Form(...), password: str = For
             "verify_aud": False
         })
         
-        pretty_payload = json.dumps(decoded_payload, indent=2)
-
         kc_roles = decoded_payload.get("realm_access", {}).get("roles", [])
+        username = decoded_payload.get("preferred_username")
         
         app_role = "viewer"
         if "admin" in kc_roles:
@@ -312,29 +335,7 @@ async def login(request: Request, username: str = Form(...), password: str = For
             
         db.commit()
 
-        page = 1
-        size = 10
-        displayed_logs, total_hits = get_logs(user_db.role, page=page, size=size)
-        total_pages = math.ceil(total_hits / size)
-
-        response = templates.TemplateResponse("dashboard.html", {
-            "request": request, 
-            "user": username, 
-            "role": user_db.role,
-            "token": access_token,
-            "decoded_token": pretty_payload,
-            "logs": displayed_logs,
-            "page": page,
-            "size": size,
-            "total_pages": total_pages,
-            "total_hits": total_hits,
-            "q": None,
-            "service": None,
-            "level": None,
-            "start_time": None,
-            "end_time": None
-        })
-        
+        response = RedirectResponse(url="/")
         if id_token:
             response.set_cookie(key="id_token", value=id_token, httponly=True)
         if access_token:

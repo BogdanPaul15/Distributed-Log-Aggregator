@@ -1,0 +1,21 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'log-ingestor'
+    dns_sd_configs:
+      - names:
+          - 'log-ingestor'
+        type: 'A'
+        port: 8080
+
+  - job_name: 'log-generator'
+    static_configs:
+      - targets: ['log-generator:8081']
+
+  - job_name: 'log-consumer'
+    dns_sd_configs:
+      - names:
+          - 'log-consumer'
+        type: 'A'
+        port: 2112

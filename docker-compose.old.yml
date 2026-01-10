@@ -1,0 +1,124 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: log_platform_db
+    networks:
+      - data_net
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    deploy:
+      replicas: 1
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:22.0
+    command: start-dev --import-realm
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    volumes:
+      - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json
+    ports:
+      - "8080:8080"
+    networks:
+      - public_net
+    deploy:
+      replicas: 1
+
+  dashboard-backend:
+    build: ./dashboard_service
+    image: dashboard-service:v1
+    environment:
+      DATABASE_URL: postgresql://admin:password@postgres:5432/log_platform_db
+      KEYCLOAK_URL: http://keycloak:8080/realms/log-realm
+      CLIENT_ID: log-client
+      CLIENT_SECRET: secret
+      OPENSEARCH_HOST: opensearch
+      OPENSEARCH_PORT: 9200
+    ports:
+      - "8000:8000"
+    networks:
+      - public_net
+      - data_net
+    depends_on:
+      - postgres
+      - keycloak
+      - opensearch
+    deploy:
+      replicas: 1
+
+  log-ingestor:
+    build: ./ingestor_service
+    image: ingestor-service:v1
+    environment:
+      OPENSEARCH_HOST: opensearch
+      OPENSEARCH_PORT: 9200
+    ports:
+      - "8001:8000"
+    networks:
+      - public_net
+      - stream_net
+      - data_net
+    depends_on:
+      - opensearch
+    deploy:
+      replicas: 2
+
+  opensearch:
+    image: opensearchproject/opensearch:2.11.0
+    environment:
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
+      - DISABLE_SECURITY_PLUGIN=true
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - opensearch_data:/usr/share/opensearch/data
+    ports:
+      - "9200:9200"
+    networks:
+      - data_net
+
+  opensearch-dashboards:
+    image: opensearchproject/opensearch-dashboards:2.11.0
+    ports:
+      - "5601:5601"
+    environment:
+      OPENSEARCH_HOSTS: '["http://opensearch:9200"]'
+      DISABLE_SECURITY_DASHBOARDS_PLUGIN: "true"
+    networks:
+      - data_net
+    depends_on:
+      - opensearch
+
+  log-generator:
+    build: ./log_generator
+    image: log-generator:v1
+    environment:
+      INGESTOR_URL: http://log-ingestor:8000/ingest
+    networks:
+      - stream_net
+    depends_on:
+      - log-ingestor
+    deploy:
+      replicas: 1
+
+networks:
+  public_net:
+    driver: overlay
+    attachable: true
+  data_net:
+    driver: overlay
+  stream_net:
+    driver: overlay
+
+volumes:
+  db_data:
+  opensearch_data:

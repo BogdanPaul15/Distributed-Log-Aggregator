@@ -1,0 +1,102 @@
+engine:
+  workers: 10
+  default_rate: 500
+  batch_size: 500
+  flush_interval: 1s 
+
+storage:
+  type: http
+  http:
+    url: "http://log-ingestor:8080/logs"
+    timeout: 5s
+
+generator:
+  global_metadata:
+    environment: "production"
+    datacenter: "us-east-1"
+    k8s_cluster_id: "cluster-alpha-01"
+    app_version: "v2.4.0"
+
+  weights:
+    DEBUG: 5
+    INFO: 80
+    WARN: 10
+    ERROR: 5
+    FATAL: 0
+
+  services:
+    - "auth-service"
+    - "payment-service"
+    - "order-service"
+    - "inventory-service"
+
+  service_profiles:
+    auth-service:
+      static_fields:
+        language: "go"
+        protocol: "gRPC"
+      messages:
+        INFO:
+          - "User logged in successfully"
+          - "Token refreshed"
+          - "Logout initiated"
+          - "MFA challenge sent"
+        WARN:
+          - "Login attempt failed: invalid password"
+          - "Token expiring in 5 minutes"
+          - "Rate limit approaching for IP"
+        ERROR:
+          - "LDAP connection timeout"
+          - "Database unavailable"
+          - "Failed to sign JWT token"
+
+    payment-service:
+      static_fields:
+        language: "java"
+        currency: "USD"
+        gateway: "stripe"
+      messages:
+        INFO:
+          - "Transaction created"
+          - "Payment authorized"
+          - "Refund processed"
+          - "Settlement batch completed"
+        WARN:
+          - "High latency detected in payment gateway"
+          - "Retry attempt 1 for transaction"
+          - "Suspicious activity detected (fraud score: medium)"
+        ERROR:
+          - "Payment declined: Insufficient funds"
+          - "Gateway timeout (504)"
+          - "Circuit breaker open for gateway"
+          - "Transaction rollback failed"
+
+    order-service:
+      static_fields:
+        language: "node"
+        db_type: "mongo"
+      messages:
+        INFO:
+          - "Order placed"
+          - "Order status updated to SHIPPED"
+          - "Confirmation email queued"
+        WARN:
+          - "Slow query detected on orders collection"
+          - "Inventory check took > 500ms"
+        ERROR:
+          - "Failed to commit order transaction"
+          - "Payment service unreachable"
+          - "Data validation error: missing shipping address"
+
+    inventory-service:
+      static_fields:
+        language: "python"
+        warehouse: "primary-01"
+      messages:
+        INFO:
+          - "Stock level checked"
+          - "Item reserved"
+          - "Restock shipment received"
+        WARN:
+          - "Low stock alert for SKU"
+          - "Sync delay with warehouse API"

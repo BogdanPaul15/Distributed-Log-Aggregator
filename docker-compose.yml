@@ -1,18 +1,88 @@
 version: '3.8'
 
 services:
+  # Infrastructure: Zookeeper & Kafka
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.3.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper/data
+      - zookeeper_log:/var/lib/zookeeper/log
+    networks:
+      - app-net
+
+  kafka:
+    image: confluentinc/cp-kafka:7.3.0
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      - KAFKA_BROKER_ID=1
+      - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      - KAFKA_INTER_BROKER_LISTENER_NAME=PLAINTEXT
+      - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+      - KAFKA_AUTO_CREATE_TOPICS_ENABLE=false
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    networks:
+      - app-net
+
+  init-kafka:
+    image: confluentinc/cp-kafka:7.3.0
+    depends_on:
+      - kafka
+    entrypoint: [ '/bin/sh', '-c' ]
+    command: |
+      "
+      # blocks until kafka is reachable
+      echo -e 'Waiting for Kafka to be ready...'
+      while ! kafka-topics --bootstrap-server kafka:29092 --list; do
+        sleep 1
+      done
+
+      echo -e 'Creating kafka topics'
+      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic logs --replication-factor 1 --partitions 4
+
+      echo -e 'Successfully created the following topics:'
+      kafka-topics --bootstrap-server kafka:29092 --list
+      "
+    networks:
+      - app-net
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    ports:
+      - "8090:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+    depends_on:
+      - kafka
+      - zookeeper
+    networks:
+      - app-net
+
+  # Database & Auth
   postgres:
     image: postgres:15
     environment:
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: password
       POSTGRES_DB: log_platform_db
-    networks:
-      - data_net
     volumes:
       - db_data:/var/lib/postgresql/data
     deploy:
       replicas: 1
+    networks:
+      - app-net
 
   keycloak:
     image: quay.io/keycloak/keycloak:22.0
@@ -24,11 +94,12 @@ services:
       - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json
     ports:
       - "8080:8080"
-    networks:
-      - public_net
     deploy:
       replicas: 1
+    networks:
+      - app-net
 
+  # Dashboard API (Python)
   dashboard-backend:
     build: ./dashboard_service
     image: dashboard-service:v1
@@ -41,33 +112,59 @@ services:
       OPENSEARCH_PORT: 9200
     ports:
       - "8000:8000"
-    networks:
-      - public_net
-      - data_net
     depends_on:
       - postgres
       - keycloak
       - opensearch
     deploy:
       replicas: 1
-
-  log-ingestor:
-    build: ./ingestor_service
-    image: ingestor-service:v1
-    environment:
-      OPENSEARCH_HOST: opensearch
-      OPENSEARCH_PORT: 9200
-    ports:
-      - "8001:8000"
     networks:
-      - public_net
-      - stream_net
-      - data_net
-    depends_on:
-      - opensearch
+      - app-net
+
+  # Go Services
+  log-ingestor:
+    build: ./log-ingestor
     deploy:
       replicas: 2
+    environment:
+      - KAFKA_BROKERS=kafka:29092
+      - KAFKA_TOPIC=logs
+      - SERVER_ADDR=:8080
+    depends_on:
+      init-kafka:
+        condition: service_completed_successfully
+    networks:
+      - app-net
 
+  log-generator:
+    build: ./log-generator
+    ports:
+      - "8081:8081"
+    volumes:
+      - ./log-generator/config.docker.yaml:/app/config.yaml
+    depends_on:
+      - log-ingestor
+    networks:
+      - app-net
+
+  log-consumer:
+    build: ./log-consumer
+    deploy:
+      replicas: 2
+    environment:
+      - KAFKA_BROKERS=kafka:29092
+      - KAFKA_TOPIC=logs
+      - KAFKA_GROUP_ID=log-consumer-group
+      - OPENSEARCH_ADDR=http://opensearch:9200
+    depends_on:
+      init-kafka:
+        condition: service_completed_successfully
+      opensearch:
+        condition: service_healthy
+    networks:
+      - app-net
+
+  # Storage & Visualization
   opensearch:
     image: opensearchproject/opensearch:2.11.0
     environment:
@@ -79,12 +176,18 @@ services:
       memlock:
         soft: -1
         hard: -1
-    volumes:
-      - opensearch_data:/usr/share/opensearch/data
     ports:
       - "9200:9200"
+      - "9600:9600"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cat/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - opensearch_data:/usr/share/opensearch/data
     networks:
-      - data_net
+      - app-net
 
   opensearch-dashboards:
     image: opensearchproject/opensearch-dashboards:2.11.0
@@ -93,32 +196,40 @@ services:
     environment:
       OPENSEARCH_HOSTS: '["http://opensearch:9200"]'
       DISABLE_SECURITY_DASHBOARDS_PLUGIN: "true"
-    networks:
-      - data_net
     depends_on:
       - opensearch
-
-  log-generator:
-    build: ./log_generator
-    image: log-generator:v1
-    environment:
-      INGESTOR_URL: http://log-ingestor:8000/ingest
     networks:
-      - stream_net
+      - app-net
+
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
     depends_on:
       - log-ingestor
-    deploy:
-      replicas: 1
+    networks:
+      - app-net
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    depends_on:
+      - prometheus
+    networks:
+      - app-net
 
 networks:
-  public_net:
-    driver: overlay
-    attachable: true
-  data_net:
-    driver: overlay
-  stream_net:
-    driver: overlay
+  app-net:
+    driver: bridge
 
 volumes:
+  zookeeper_data:
+  zookeeper_log:
+  kafka_data:
   db_data:
   opensearch_data:

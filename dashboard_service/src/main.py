@@ -10,10 +10,23 @@ import datetime
 
 app = FastAPI(title="Dashboard API")
 
-try:
-    models.Base.metadata.create_all(bind=database.engine)
-except Exception as e:
-    print(f"Warning: DB not ready yet. Retrying on next startup. Error: {e}")
+# Retry logic for DB connection
+import time
+from sqlalchemy.exc import OperationalError
+
+MAX_RETRIES = 15
+RETRY_DELAY = 3
+
+for i in range(MAX_RETRIES):
+    try:
+        models.Base.metadata.create_all(bind=database.engine)
+        print("Database tables created successfully.")
+        break
+    except Exception as e:
+        print(f"Database not ready (Attempt {i+1}/{MAX_RETRIES}). Retrying in {RETRY_DELAY} seconds... Error: {e}")
+        time.sleep(RETRY_DELAY)
+else:
+    print("Could not connect to database after several attempts.")
 
 templates = Jinja2Templates(directory="templates")
 
@@ -89,10 +102,10 @@ def get_logs(role: str, page: int = 1, size: int = 10, search_query: str = None,
         })
 
     if service:
-        must_conditions.append({"term": {"service": service}})
+        must_conditions.append({"term": {"service.keyword": service}})
         
     if level:
-        must_conditions.append({"term": {"level": level}})
+        must_conditions.append({"term": {"level.keyword": level}})
 
     timestamp_range = {}
     if start_time:
@@ -101,7 +114,7 @@ def get_logs(role: str, page: int = 1, size: int = 10, search_query: str = None,
         timestamp_range["lte"] = end_time
         
     if role == 'viewer':
-        must_conditions.append({"terms": {"level": ["INFO", "WARN"]}})
+        must_conditions.append({"terms": {"level.keyword": ["INFO", "WARN"]}})
         # Viewer is restricted to last 3 hours. 
         # If user provides a start_time, it must be within the last 3 hours.
         # We can just add another range condition, OpenSearch will intersect them.

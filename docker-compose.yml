@@ -13,7 +13,7 @@ services:
       - zookeeper_data:/var/lib/zookeeper/data
       - zookeeper_log:/var/lib/zookeeper/log
     networks:
-      - app-net
+      - stream_net
 
   kafka:
     image: confluentinc/cp-kafka:7.3.0
@@ -32,7 +32,7 @@ services:
     volumes:
       - kafka_data:/var/lib/kafka/data
     networks:
-      - app-net
+      - stream_net
 
   init-kafka:
     image: confluentinc/cp-kafka:7.3.0
@@ -54,7 +54,7 @@ services:
       kafka-topics --bootstrap-server kafka:29092 --list
       "
     networks:
-      - app-net
+      - stream_net
 
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
@@ -68,7 +68,7 @@ services:
       - kafka
       - zookeeper
     networks:
-      - app-net
+      - stream_net
 
   # Database & Auth
   postgres:
@@ -82,7 +82,7 @@ services:
     deploy:
       replicas: 1
     networks:
-      - app-net
+      - data_net
 
   keycloak:
     image: quay.io/keycloak/keycloak:22.0
@@ -97,7 +97,8 @@ services:
     deploy:
       replicas: 1
     networks:
-      - app-net
+      - public_net
+      - data_net
 
   # Dashboard API (Python)
   dashboard-backend:
@@ -119,11 +120,13 @@ services:
     deploy:
       replicas: 1
     networks:
-      - app-net
+      - public_net
+      - data_net
 
   # Go Services
   log-ingestor:
     build: ./log-ingestor
+    image: log-ingestor:latest
     deploy:
       replicas: 2
     environment:
@@ -131,13 +134,13 @@ services:
       - KAFKA_TOPIC=logs
       - SERVER_ADDR=:8080
     depends_on:
-      init-kafka:
-        condition: service_completed_successfully
+      - init-kafka
     networks:
-      - app-net
+      - stream_net
 
   log-generator:
     build: ./log-generator
+    image: log-generator:latest
     ports:
       - "8081:8081"
     volumes:
@@ -145,10 +148,12 @@ services:
     depends_on:
       - log-ingestor
     networks:
-      - app-net
+      - public_net
+      - stream_net
 
   log-consumer:
     build: ./log-consumer
+    image: log-consumer:latest
     deploy:
       replicas: 2
     environment:
@@ -157,12 +162,11 @@ services:
       - KAFKA_GROUP_ID=log-consumer-group
       - OPENSEARCH_ADDR=http://opensearch:9200
     depends_on:
-      init-kafka:
-        condition: service_completed_successfully
-      opensearch:
-        condition: service_healthy
+      - init-kafka
+      - opensearch
     networks:
-      - app-net
+      - data_net
+      - stream_net
 
   # Storage & Visualization
   opensearch:
@@ -187,7 +191,7 @@ services:
     volumes:
       - opensearch_data:/usr/share/opensearch/data
     networks:
-      - app-net
+      - data_net
 
   opensearch-dashboards:
     image: opensearchproject/opensearch-dashboards:2.11.0
@@ -199,7 +203,8 @@ services:
     depends_on:
       - opensearch
     networks:
-      - app-net
+      - data_net
+      - public_net
 
   prometheus:
     image: prom/prometheus:latest
@@ -210,7 +215,8 @@ services:
     depends_on:
       - log-ingestor
     networks:
-      - app-net
+      - stream_net
+      - monitoring_net
 
   grafana:
     image: grafana/grafana:latest
@@ -221,11 +227,18 @@ services:
     depends_on:
       - prometheus
     networks:
-      - app-net
+      - public_net
+      - monitoring_net
 
 networks:
-  app-net:
-    driver: bridge
+  public_net:
+    driver: overlay
+  data_net:
+    driver: overlay
+  stream_net:
+    driver: overlay
+  monitoring_net:
+    driver: overlay
 
 volumes:
   zookeeper_data:

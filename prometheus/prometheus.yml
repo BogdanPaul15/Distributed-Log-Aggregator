@@ -5,7 +5,7 @@ scrape_configs:
   - job_name: 'log-ingestor'
     dns_sd_configs:
       - names:
-          - 'log-ingestor'
+          - 'tasks.log-ingestor'
         type: 'A'
         port: 8080
 
@@ -16,6 +16,6 @@ scrape_configs:
   - job_name: 'log-consumer'
     dns_sd_configs:
       - names:
-          - 'log-consumer'
+          - 'tasks.log-consumer'
         type: 'A'
         port: 2112

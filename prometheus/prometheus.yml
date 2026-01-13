@@ -19,3 +19,8 @@ scrape_configs:
           - 'tasks.log-consumer'
         type: 'A'
         port: 2112
+
+  - job_name: 'cadvisor'
+    scrape_interval: 5s
+    static_configs:
+      - targets: ['cadvisor:8080']

@@ -49,6 +49,21 @@ func (c *Consumer) Start(ctx context.Context) error {
 	defer c.reader.Close()
 	log.Println("Starting Kafka consumer with batch processing...")
 
+	// Start background metric updater
+	go func() {
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				stats := c.reader.Stats()
+				consumerLag.Set(float64(stats.Lag))
+			}
+		}
+	}()
+
 	const (
 		batchSize     = 500
 		flushInterval = 1 * time.Second
@@ -136,8 +151,6 @@ func (c *Consumer) Start(ctx context.Context) error {
 		batchEvents = append(batchEvents, event)
 		batchMessages = append(batchMessages, m)
 
-		stats := c.reader.Stats()
-		consumerLag.Set(float64(stats.Lag))
 
 		if len(batchEvents) >= batchSize {
 			if err := flush(); err != nil {

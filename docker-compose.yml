@@ -104,6 +104,8 @@ services:
   dashboard-backend:
     build: ./dashboard_service
     image: dashboard-service:v1
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
     environment:
       DATABASE_URL: postgresql://admin:password@postgres:5432/log_platform_db
       KEYCLOAK_URL: http://keycloak:8080/realms/log-realm
@@ -145,6 +147,7 @@ services:
       - "8081:8081"
     volumes:
       - ./log-generator/config.docker.yaml:/app/config.yaml
+      - /etc/localtime:/etc/localtime:ro
     depends_on:
       - log-ingestor
     networks:
@@ -228,6 +231,22 @@ services:
       - prometheus
     networks:
       - public_net
+      - monitoring_net
+
+
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.47.0
+    ports:
+      - "8088:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/run/containerd/containerd.sock:/var/run/containerd/containerd.sock:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    networks:
       - monitoring_net
 
 networks:

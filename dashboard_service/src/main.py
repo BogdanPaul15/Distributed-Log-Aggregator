@@ -109,9 +109,25 @@ def get_logs(role: str, page: int = 1, size: int = 10, search_query: str = None,
 
     timestamp_range = {}
     if start_time:
-        timestamp_range["gte"] = start_time
+        # If input has no timezone, assume local system time (which matches host via /etc/localtime)
+        # and convert/format to RFC3339 with offset for OpenSearch
+        try:
+             # Parse naive string e.g., "2026-01-13T17:55"
+            dt = datetime.datetime.fromisoformat(start_time)
+            # Make it aware using local timezone
+            dt_aware = dt.astimezone() 
+            timestamp_range["gte"] = dt_aware.isoformat()
+        except ValueError:
+            # Fallback if parsing fails or already has tz
+            timestamp_range["gte"] = start_time
+
     if end_time:
-        timestamp_range["lte"] = end_time
+        try:
+            dt = datetime.datetime.fromisoformat(end_time)
+            dt_aware = dt.astimezone()
+            timestamp_range["lte"] = dt_aware.isoformat()
+        except ValueError:
+            timestamp_range["lte"] = end_time
         
     if role == 'viewer':
         must_conditions.append({"terms": {"level.keyword": ["INFO", "WARN"]}})

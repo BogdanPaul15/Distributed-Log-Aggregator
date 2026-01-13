@@ -25,10 +25,8 @@ func NewProducer(brokers []string, topic string) *Producer {
 }
 
 func (p *Producer) Produce(ctx context.Context, event model.LogEvent) error {
-	key := event.TraceID
-	if key == "" {
-		key = event.Service
-	}
+	// Partition by Log Level
+	key := string(event.Level)
 
 	value, err := json.Marshal(event)
 	if err != nil {
@@ -51,10 +49,8 @@ func (p *Producer) Produce(ctx context.Context, event model.LogEvent) error {
 func (p *Producer) ProduceBatch(ctx context.Context, events []model.LogEvent) error {
 	msgs := make([]kafka.Message, len(events))
 	for i, event := range events {
-		key := event.TraceID
-		if key == "" {
-			key = event.Service
-		}
+		// Partition by Log Level
+		key := string(event.Level)
 
 		value, err := json.Marshal(event)
 		if err != nil {

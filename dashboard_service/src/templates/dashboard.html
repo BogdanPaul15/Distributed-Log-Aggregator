@@ -1,21 +1,44 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <title>Log Analytics Platform</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        .log-row { transition: all 0.2s; }
-        .log-debug { color: #6c757d; }
-        .log-info { color: #0d6efd; }
-        .log-warn { color: #fd7e14; font-weight: bold; }
-        .log-error { color: #dc3545; font-weight: bold; }
-        .log-fatal { background-color: #dc3545; color: white; font-weight: bold; }
+        .log-row {
+            transition: all 0.2s;
+        }
+
+        .log-debug {
+            color: #6c757d;
+        }
+
+        .log-info {
+            color: #0d6efd;
+        }
+
+        .log-warn {
+            color: #fd7e14;
+            font-weight: bold;
+        }
+
+        .log-error {
+            color: #dc3545;
+            font-weight: bold;
+        }
+
+        .log-fatal {
+            background-color: #dc3545;
+            color: white;
+            font-weight: bold;
+        }
     </style>
 </head>
+
 <body class="bg-light">
     <div class="container mt-5 mb-5">
         <h1 class="text-center mb-4">Distributed Log Platform</h1>
-        
+
         {% if user %}
         <div class="card shadow">
             <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
@@ -23,15 +46,23 @@
                     <span class="me-2">Welcome, <strong>{{ user }}</strong></span>
                     <span class="badge bg-light text-success text-uppercase">{{ role }}</span>
                 </div>
-                <a href="/logout" class="btn btn-outline-light btn-sm">Logout</a>
+                <div class="d-flex gap-2">
+                    {% if role == 'admin' %}
+                    <a href="http://localhost:3000" target="_blank" class="btn btn-outline-light btn-sm">Grafana
+                        Dashboard</a>
+                    {% endif %}
+                    <a href="/logout" class="btn btn-outline-light btn-sm">Logout</a>
+                </div>
             </div>
-            
+
             <div class="card-body">
-                
+
                 {% if role == 'viewer' %}
                 <div class="alert alert-warning d-flex align-items-center" role="alert">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" class="bi bi-exclamation-triangle-fill me-2" viewBox="0 0 16 16">
-                        <path d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z"/>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor"
+                        class="bi bi-exclamation-triangle-fill me-2" viewBox="0 0 16 16">
+                        <path
+                            d="M8.982 1.566a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566zM8 5c.535 0 .954.462.9.995l-.35 3.507a.552.552 0 0 1-1.1 0L7.1 5.995A.905.905 0 0 1 8 5zm.002 6a1 1 0 1 1 0 2 1 1 0 0 1 0-2z" />
                     </svg>
                     <div>
                         <strong>Viewer Mode:</strong> Sensitive logs (ERROR/FATAL) and Token details are hidden.
@@ -54,23 +85,25 @@
                         </ul>
                     </div>
                     <div class="col-md-6">
-                         <h5>SSO Context</h5>
-                         <p class="text-muted small">Authenticated via Keycloak (OpenID Connect)</p>
+                        <h5>SSO Context</h5>
+                        <p class="text-muted small">Authenticated via Keycloak (OpenID Connect)</p>
                     </div>
                 </div>
 
                 <hr>
-                
+
                 {% if role != 'viewer' %}
                 <h5>Token Inspector</h5>
                 <div class="row">
                     <div class="col-md-6">
                         <label class="form-label small text-muted">Raw Access Token (JWT)</label>
-                        <textarea class="form-control" rows="5" readonly style="font-family: monospace; font-size: 0.75rem; background-color: #f8f9fa;">{{ token }}</textarea>
+                        <textarea class="form-control" rows="5" readonly
+                            style="font-family: monospace; font-size: 0.75rem; background-color: #f8f9fa;">{{ token }}</textarea>
                     </div>
                     <div class="col-md-6">
                         <label class="form-label small text-muted">Decoded Payload (Claims)</label>
-                        <pre class="border rounded p-3" style="background-color: #2d2d2d; color: #00ff00; font-size: 0.75rem; max-height: 130px; overflow-y: auto;">{{ decoded_token }}</pre>
+                        <pre class="border rounded p-3"
+                            style="background-color: #2d2d2d; color: #00ff00; font-size: 0.75rem; max-height: 130px; overflow-y: auto;">{{ decoded_token }}</pre>
                     </div>
                 </div>
                 <hr class="mt-4 mb-4">
@@ -80,35 +113,61 @@
                     <h3>Live Logs</h3>
                     {% if role != 'viewer' %}
                     <div class="btn-group">
-                        <a href="/export?format=csv&q={{ q or '' }}&service={{ service or '' }}&level={{ level or '' }}&start_time={{ start_time or '' }}&end_time={{ end_time or '' }}" class="btn btn-outline-primary btn-sm">Export CSV</a>
-                        <a href="/export?format=json&q={{ q or '' }}&service={{ service or '' }}&level={{ level or '' }}&start_time={{ start_time or '' }}&end_time={{ end_time or '' }}" class="btn btn-outline-secondary btn-sm">Export JSON</a>
+                        <a href="/export?format=csv&q={{ q or '' }}&service={{ service or '' }}&level={{ level or '' }}&start_time={{ start_time or '' }}&end_time={{ end_time or '' }}"
+                            class="btn btn-outline-primary btn-sm">Export CSV</a>
+                        <a href="/export?format=json&q={{ q or '' }}&service={{ service or '' }}&level={{ level or '' }}&start_time={{ start_time or '' }}&end_time={{ end_time or '' }}"
+                            class="btn btn-outline-secondary btn-sm">Export JSON</a>
                     </div>
                     {% endif %}
                 </div>
-                
-                <form method="get" action="/" class="mb-4">
+
+                <div class="mb-3">
+                    <small class="text-muted d-block mb-2">Quick Ranges:</small>
+                    <div class="btn-group" role="group">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setTimeRange(5)">Last
+                            5m</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setTimeRange(15)">Last
+                            15m</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setTimeRange(30)">Last
+                            30m</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setTimeRange(60)">Last
+                            1h</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setTimeRange(180)">Last
+                            3h</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setTimeRange(360)">Last
+                            6h</button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setTimeRange(720)">Last
+                            12h</button>
+                    </div>
+                </div>
+
+                <form method="get" action="/" class="mb-4" id="filterForm">
                     <div class="row g-3">
                         <div class="col-md-3">
-                            <input type="text" name="q" class="form-control" placeholder="Search message..." value="{{ q or '' }}">
+                            <input type="text" name="q" class="form-control" placeholder="Search message..."
+                                value="{{ q or '' }}">
                         </div>
                         <div class="col-md-2">
-                            <input type="text" name="service" class="form-control" placeholder="Service" value="{{ service or '' }}">
+                            <input type="text" name="service" class="form-control" placeholder="Service"
+                                value="{{ service or '' }}">
                         </div>
                         <div class="col-md-2">
                             <select name="level" class="form-select">
                                 <option value="">All Levels</option>
-                                <option value="INFO" {% if level == 'INFO' %}selected{% endif %}>INFO</option>
-                                <option value="WARN" {% if level == 'WARN' %}selected{% endif %}>WARN</option>
-                                <option value="ERROR" {% if level == 'ERROR' %}selected{% endif %}>ERROR</option>
-                                <option value="DEBUG" {% if level == 'DEBUG' %}selected{% endif %}>DEBUG</option>
-                                <option value="FATAL" {% if level == 'FATAL' %}selected{% endif %}>FATAL</option>
+                                <option value="INFO" {% if level=='INFO' %}selected{% endif %}>INFO</option>
+                                <option value="WARN" {% if level=='WARN' %}selected{% endif %}>WARN</option>
+                                <option value="ERROR" {% if level=='ERROR' %}selected{% endif %}>ERROR</option>
+                                <option value="DEBUG" {% if level=='DEBUG' %}selected{% endif %}>DEBUG</option>
+                                <option value="FATAL" {% if level=='FATAL' %}selected{% endif %}>FATAL</option>
                             </select>
                         </div>
                         <div class="col-md-2">
-                            <input type="datetime-local" name="start_time" class="form-control" value="{{ start_time or '' }}" title="Start Time">
+                            <input type="datetime-local" name="start_time" class="form-control"
+                                value="{{ start_time or '' }}" title="Start Time">
                         </div>
                         <div class="col-md-2">
-                            <input type="datetime-local" name="end_time" class="form-control" value="{{ end_time or '' }}" title="End Time">
+                            <input type="datetime-local" name="end_time" class="form-control"
+                                value="{{ end_time or '' }}" title="End Time">
                         </div>
                         <div class="col-md-1">
                             <button type="submit" class="btn btn-primary w-100">Filter</button>
@@ -129,7 +188,7 @@
                         <tbody>
                             {% for log in logs %}
                             <tr class="log-row">
-                                <td class="text-nowrap small">{{ log.timestamp }}</td>
+                                <td class="text-nowrap small log-timestamp">{{ log.timestamp }}</td>
                                 <td>
                                     <span class="
                                         {% if log.level == 'INFO' %} log-info
@@ -145,7 +204,7 @@
                             {% endfor %}
                         </tbody>
                     </table>
-                    
+
                     {% if not logs %}
                     <div class="text-center p-4 text-muted">
                         No logs found matching your criteria.
@@ -156,13 +215,16 @@
                     <nav aria-label="Page navigation" class="mt-4">
                         <ul class="pagination justify-content-center">
                             <li class="page-item {% if page <= 1 %}disabled{% endif %}">
-                                <a class="page-link" href="/?page={{ page - 1 }}&q={{ q or '' }}&service={{ service or '' }}&level={{ level or '' }}&start_time={{ start_time or '' }}&end_time={{ end_time or '' }}">Previous</a>
+                                <a class="page-link"
+                                    href="/?page={{ page - 1 }}&q={{ q or '' }}&service={{ service or '' }}&level={{ level or '' }}&start_time={{ start_time or '' }}&end_time={{ end_time or '' }}">Previous</a>
                             </li>
                             <li class="page-item disabled">
-                                <span class="page-link">Page {{ page }} of {{ total_pages }} ({{ total_hits }} logs)</span>
+                                <span class="page-link">Page {{ page }} of {{ total_pages }} ({{ total_hits }}
+                                    logs)</span>
                             </li>
                             <li class="page-item {% if page >= total_pages %}disabled{% endif %}">
-                                <a class="page-link" href="/?page={{ page + 1 }}&q={{ q or '' }}&service={{ service or '' }}&level={{ level or '' }}&start_time={{ start_time or '' }}&end_time={{ end_time or '' }}">Next</a>
+                                <a class="page-link"
+                                    href="/?page={{ page + 1 }}&q={{ q or '' }}&service={{ service or '' }}&level={{ level or '' }}&start_time={{ start_time or '' }}&end_time={{ end_time or '' }}">Next</a>
                             </li>
                         </ul>
                     </nav>
@@ -176,7 +238,7 @@
             <div class="card-body">
                 <h5 class="card-title text-center">Login</h5>
                 {% if error %}
-                    <div class="alert alert-danger">{{ error }}</div>
+                <div class="alert alert-danger">{{ error }}</div>
                 {% endif %}
                 <div class="text-center">
                     <p class="mb-4">Please sign in.</p>
@@ -188,5 +250,38 @@
         </div>
         {% endif %}
     </div>
+
+    <script>
+        function setTimeRange(minutes) {
+            const now = new Date();
+            const start = new Date(now.getTime() - minutes * 60000);
+
+            // Format to YYYY-MM-DDTHH:mm (local time) required by datetime-local input
+            const formatForInput = (date) => {
+                const offset = date.getTimezoneOffset() * 60000;
+                const localISOTime = (new Date(date - offset)).toISOString().slice(0, 16);
+                return localISOTime;
+            };
+
+            document.querySelector('input[name="start_time"]').value = formatForInput(start);
+            document.querySelector('input[name="end_time"]').value = formatForInput(now);
+
+            // Auto submit
+            document.getElementById('filterForm').submit();
+        }
+
+        // Convert all UTC timestamps to local time on load
+        document.addEventListener('DOMContentLoaded', function () {
+            document.querySelectorAll('.log-timestamp').forEach(function (el) {
+                const date = new Date(el.textContent);
+                if (!isNaN(date.getTime())) {
+                    // Customize format as needed, e.g., 'YYYY-MM-DD HH:mm:ss'
+                    // using toLocaleString() is the simplest way to get local format with timezone
+                    el.textContent = date.toLocaleString('sv-SE'); // sv-SE gives ISO-like YYYY-MM-DD HH:mm:ss format which is clean
+                }
+            });
+        });
+    </script>
 </body>
+
 </html>

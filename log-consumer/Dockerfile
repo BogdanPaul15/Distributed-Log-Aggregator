@@ -12,6 +12,8 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o log-consumer cmd/main.go
 
 FROM alpine:latest
 
+RUN apk add --no-cache netcat-openbsd
+
 WORKDIR /app
 
 COPY --from=builder /app/log-consumer .

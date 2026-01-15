@@ -498,54 +498,6 @@
 			}
 		},
 		{
-			"name": "12. Ingest Log",
-			"event": [
-				{
-					"listen": "prerequest",
-					"script": {
-						"exec": [
-							"pm.collectionVariables.set(\"unique_id\", require('uuid').v4());"
-						],
-						"type": "text/javascript"
-					}
-				},
-				{
-					"listen": "test",
-					"script": {
-						"exec": [
-							"pm.test(\"Status code is 200\", function () {",
-							"    pm.response.to.have.status(200);",
-							"});"
-						],
-						"type": "text/javascript"
-					}
-				}
-			],
-			"request": {
-				"method": "POST",
-				"header": [
-					{
-						"key": "Content-Type",
-						"value": "application/json",
-						"type": "text"
-					}
-				],
-				"body": {
-					"mode": "raw",
-					"raw": "{\n    \"service\": \"postman-test\",\n    \"level\": \"INFO\",\n    \"message\": \"Postman Comprehensive Test {{unique_id}}\"\n}"
-				},
-				"url": {
-					"raw": "{{ingestor_url}}/ingest",
-					"host": [
-						"{{ingestor_url}}"
-					],
-					"path": [
-						"ingest"
-					]
-				}
-			}
-		},
-		{
 			"name": "13. Logout Developer",
 			"event": [
 				{
@@ -639,33 +591,130 @@
 			}
 		},
 		{
-			"name": "15. Search Log (Admin)",
+			"name": "15. Create Saved Search (POST)",
 			"event": [
-				{
-					"listen": "prerequest",
-					"script": {
-						"exec": [
-							"// Wait 5 seconds for indexing",
-							"const date = Date.now();",
-							"let currentDate = null;",
-							"do {",
-							"    currentDate = Date.now();",
-							"} while (currentDate - date < 5000);"
-						],
-						"type": "text/javascript"
-					}
-				},
 				{
 					"listen": "test",
 					"script": {
 						"exec": [
+							"var jsonData = pm.response.json();",
 							"pm.test(\"Status code is 200\", function () {",
 							"    pm.response.to.have.status(200);",
 							"});",
-							"pm.test(\"Log Found\", function () {",
-							"    var uuid = pm.collectionVariables.get(\"unique_id\");",
-							"    pm.expect(pm.response.text()).to.include(uuid);",
-							"    pm.expect(pm.response.text()).to.not.include(\"No logs found matching your criteria\");",
+							"pm.test(\"Search created with correct name\", function () {",
+							"    pm.expect(jsonData.name).to.eql(\"Test Search 1\");",
+							"});",
+							"if (jsonData.id) {",
+							"    pm.collectionVariables.set(\"saved_search_id\", jsonData.id);",
+							"}"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Cookie",
+						"value": "access_token={{access_token}}; id_token={{id_token}}",
+						"type": "text"
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"name\": \"Test Search 1\",\n    \"query\": \"{\\\"level\\\": \\\"ERROR\\\"}\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/searches",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"searches"
+					]
+				}
+			}
+		},
+		{
+			"name": "15a. Login Viewer (for RBAC Test)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"var jsonData = pm.response.json();",
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"if (jsonData.access_token) {",
+							"    pm.collectionVariables.set(\"access_token\", jsonData.access_token);",
+							"    pm.collectionVariables.set(\"id_token\", jsonData.id_token);",
+							"}"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "urlencoded",
+					"urlencoded": [
+						{
+							"key": "client_id",
+							"value": "log-client",
+							"type": "text"
+						},
+						{
+							"key": "client_secret",
+							"value": "secret",
+							"type": "text"
+						},
+						{
+							"key": "username",
+							"value": "viewer",
+							"type": "text"
+						},
+						{
+							"key": "password",
+							"value": "viewer",
+							"type": "text"
+						},
+						{
+							"key": "grant_type",
+							"value": "password",
+							"type": "text"
+						}
+					]
+				},
+				"url": {
+					"raw": "{{keycloak_token_url}}",
+					"host": [
+						"{{keycloak_token_url}}"
+					]
+				}
+			}
+		},
+		{
+			"name": "15b. Viewer Delete Admin Search (Forbidden)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 403\", function () {",
+							"    pm.response.to.have.status(403);",
+							"});",
+							"pm.test(\"Error is unauthorized\", function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData.detail).to.eql(\"Not authorized to delete this search\");",
 							"});"
 						],
 						"type": "text/javascript"
@@ -673,7 +722,7 @@
 				}
 			],
 			"request": {
-				"method": "GET",
+				"method": "DELETE",
 				"header": [
 					{
 						"key": "Cookie",
@@ -682,46 +731,87 @@
 					}
 				],
 				"url": {
-					"raw": "{{base_url}}/?q={{unique_id}}",
+					"raw": "{{base_url}}/searches/{{saved_search_id}}",
 					"host": [
 						"{{base_url}}"
 					],
 					"path": [
-						""
-					],
-					"query": [
-						{
-							"key": "q",
-							"value": "{{unique_id}}"
-						}
+						"searches",
+						"{{saved_search_id}}"
 					]
 				}
 			}
 		},
 		{
-			"name": "16. Ingest Filter Test Log",
+			"name": "15c. Re-Login Admin",
 			"event": [
-				{
-					"listen": "prerequest",
-					"script": {
-						"exec": [
-							"const now = new Date();",
-							"pm.collectionVariables.set(\"filter_id\", require('uuid').v4());",
-							"pm.collectionVariables.set(\"filter_timestamp\", now.toISOString());",
-							"const start = new Date(now.getTime() - 60000);",
-							"const end = new Date(now.getTime() + 60000);",
-							"pm.collectionVariables.set(\"start_time\", start.toISOString());",
-							"pm.collectionVariables.set(\"end_time\", end.toISOString());"
-						],
-						"type": "text/javascript"
-					}
-				},
 				{
 					"listen": "test",
 					"script": {
 						"exec": [
+							"var jsonData = pm.response.json();",
 							"pm.test(\"Status code is 200\", function () {",
 							"    pm.response.to.have.status(200);",
+							"});",
+							"if (jsonData.access_token) {",
+							"    pm.collectionVariables.set(\"access_token\", jsonData.access_token);",
+							"    pm.collectionVariables.set(\"id_token\", jsonData.id_token);",
+							"}"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "urlencoded",
+					"urlencoded": [
+						{
+							"key": "client_id",
+							"value": "log-client",
+							"type": "text"
+						},
+						{
+							"key": "client_secret",
+							"value": "secret",
+							"type": "text"
+						},
+						{
+							"key": "username",
+							"value": "admin",
+							"type": "text"
+						},
+						{
+							"key": "password",
+							"value": "admin",
+							"type": "text"
+						},
+						{
+							"key": "grant_type",
+							"value": "password",
+							"type": "text"
+						}
+					]
+				},
+				"url": {
+					"raw": "{{keycloak_token_url}}",
+					"host": [
+						"{{keycloak_token_url}}"
+					]
+				}
+			}
+		},
+		{
+			"name": "16. Create Saved Search Invalid (POST)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 422\", function () {",
+							"    pm.response.to.have.status(422);",
 							"});"
 						],
 						"type": "text/javascript"
@@ -732,6 +822,11 @@
 				"method": "POST",
 				"header": [
 					{
+						"key": "Cookie",
+						"value": "access_token={{access_token}}; id_token={{id_token}}",
+						"type": "text"
+					},
+					{
 						"key": "Content-Type",
 						"value": "application/json",
 						"type": "text"
@@ -739,47 +834,37 @@
 				],
 				"body": {
 					"mode": "raw",
-					"raw": "{\n    \"service\": \"filter-service\",\n    \"level\": \"WARN\",\n    \"message\": \"Filter Test {{filter_id}}\",\n    \"timestamp\": \"{{filter_timestamp}}\"\n}"
+					"raw": "{\n    \"name\": \"Invalid Search\"\n    \n}"
 				},
 				"url": {
-					"raw": "{{ingestor_url}}/ingest",
+					"raw": "{{base_url}}/searches",
 					"host": [
-						"{{ingestor_url}}"
+						"{{base_url}}"
 					],
 					"path": [
-						"ingest"
+						"searches"
 					]
 				}
 			}
 		},
 		{
-			"name": "17. Search with Filters (Admin)",
+			"name": "17. List Saved Searches (GET)",
 			"event": [
-				{
-					"listen": "prerequest",
-					"script": {
-						"exec": [
-							"// Wait 5 seconds for indexing",
-							"const date = Date.now();",
-							"let currentDate = null;",
-							"do {",
-							"    currentDate = Date.now();",
-							"} while (currentDate - date < 5000);"
-						],
-						"type": "text/javascript"
-					}
-				},
 				{
 					"listen": "test",
 					"script": {
 						"exec": [
+							"var jsonData = pm.response.json();",
 							"pm.test(\"Status code is 200\", function () {",
 							"    pm.response.to.have.status(200);",
 							"});",
-							"pm.test(\"Log Found with Filters\", function () {",
-							"    var uuid = pm.collectionVariables.get(\"filter_id\");",
-							"    pm.expect(pm.response.text()).to.include(uuid);",
-							"    pm.expect(pm.response.text()).to.not.include(\"No logs found matching your criteria\");",
+							"pm.test(\"Returns array\", function () {",
+							"    pm.expect(jsonData).to.be.an(\"array\");",
+							"});",
+							"pm.test(\"Contains created search\", function () {",
+							"    var id = pm.collectionVariables.get(\"saved_search_id\");",
+							"    var found = jsonData.find(s => s.id == id);",
+							"    pm.expect(found).to.not.be.undefined;",
 							"});"
 						],
 						"type": "text/javascript"
@@ -796,34 +881,178 @@
 					}
 				],
 				"url": {
-					"raw": "{{base_url}}/?q={{filter_id}}&service=filter-service&level=WARN&start_time={{start_time}}&end_time={{end_time}}",
+					"raw": "{{base_url}}/searches",
 					"host": [
 						"{{base_url}}"
 					],
 					"path": [
-						""
+						"searches"
+					]
+				}
+			}
+		},
+		{
+			"name": "18. Update Saved Search (PUT)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"var jsonData = pm.response.json();",
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"pm.test(\"Name verified updated\", function () {",
+							"    pm.expect(jsonData.name).to.eql(\"Test Search Updated\");",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Cookie",
+						"value": "access_token={{access_token}}; id_token={{id_token}}",
+						"type": "text"
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"name\": \"Test Search Updated\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/searches/{{saved_search_id}}",
+					"host": [
+						"{{base_url}}"
 					],
-					"query": [
-						{
-							"key": "q",
-							"value": "{{filter_id}}"
-						},
-						{
-							"key": "service",
-							"value": "filter-service"
-						},
-						{
-							"key": "level",
-							"value": "WARN"
-						},
-						{
-							"key": "start_time",
-							"value": "{{start_time}}"
-						},
-						{
-							"key": "end_time",
-							"value": "{{end_time}}"
-						}
+					"path": [
+						"searches",
+						"{{saved_search_id}}"
+					]
+				}
+			}
+		},
+		{
+			"name": "19. Update Saved Search Invalid ID (PUT)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 404\", function () {",
+							"    pm.response.to.have.status(404);",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Cookie",
+						"value": "access_token={{access_token}}; id_token={{id_token}}",
+						"type": "text"
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"name\": \"Should Not Work\"\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/searches/999999",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"searches",
+						"999999"
+					]
+				}
+			}
+		},
+		{
+			"name": "20. Delete Saved Search (DELETE)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "DELETE",
+				"header": [
+					{
+						"key": "Cookie",
+						"value": "access_token={{access_token}}; id_token={{id_token}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{base_url}}/searches/{{saved_search_id}}",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"searches",
+						"{{saved_search_id}}"
+					]
+				}
+			}
+		},
+		{
+			"name": "21. Delete Saved Search Invalid ID (DELETE)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 404\", function () {",
+							"    pm.response.to.have.status(404);",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "DELETE",
+				"header": [
+					{
+						"key": "Cookie",
+						"value": "access_token={{access_token}}; id_token={{id_token}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{base_url}}/searches/999999",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"searches",
+						"999999"
 					]
 				}
 			}

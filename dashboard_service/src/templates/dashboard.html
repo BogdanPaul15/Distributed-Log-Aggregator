@@ -70,28 +70,6 @@
                 </div>
                 {% endif %}
 
-                <div class="row">
-                    <div class="col-md-6">
-                        <h5>System Status</h5>
-                        <ul class="list-group mb-3">
-                            <li class="list-group-item d-flex justify-content-between align-items-center">
-                                Database Connection <span class="badge bg-primary rounded-pill">Active</span>
-                            </li>
-                            {% if role != 'viewer' %}
-                            <li class="list-group-item d-flex justify-content-between align-items-center">
-                                Ingestion API <span class="badge bg-secondary rounded-pill">Running on Port 8001</span>
-                            </li>
-                            {% endif %}
-                        </ul>
-                    </div>
-                    <div class="col-md-6">
-                        <h5>SSO Context</h5>
-                        <p class="text-muted small">Authenticated via Keycloak (OpenID Connect)</p>
-                    </div>
-                </div>
-
-                <hr>
-
                 {% if role != 'viewer' %}
                 <h5>Token Inspector</h5>
                 <div class="row">
@@ -138,6 +116,29 @@
                             6h</button>
                         <button type="button" class="btn btn-outline-secondary btn-sm" onclick="setTimeRange(720)">Last
                             12h</button>
+                    </div>
+                </div>
+
+                <div class="row mb-4">
+                    <div class="col-md-12">
+                        <div class="input-group mb-2">
+                            <span class="input-group-text">Saved Searches</span>
+                            <select class="form-select" id="savedSearchSelect" onchange="loadSavedSearch()">
+                                <option value="" selected>-- Load a Saved Search --</option>
+                                {% for search in saved_searches %}
+                                <option value="{{ search.id }}" data-query="{{ search.query }}"
+                                    data-name="{{ search.name }}">
+                                    {{ search.name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <button class="btn btn-outline-success" type="button" onclick="saveCurrentSearch()">Save
+                                Current</button>
+                            <button class="btn btn-outline-primary" type="button"
+                                onclick="updateSelectedSearch()">Update</button>
+                            <button class="btn btn-outline-danger" type="button"
+                                onclick="deleteSelectedSearch()">Delete</button>
+                        </div>
                     </div>
                 </div>
 
@@ -256,7 +257,6 @@
             const now = new Date();
             const start = new Date(now.getTime() - minutes * 60000);
 
-            // Format to YYYY-MM-DDTHH:mm (local time) required by datetime-local input
             const formatForInput = (date) => {
                 const offset = date.getTimezoneOffset() * 60000;
                 const localISOTime = (new Date(date - offset)).toISOString().slice(0, 16);
@@ -266,21 +266,130 @@
             document.querySelector('input[name="start_time"]').value = formatForInput(start);
             document.querySelector('input[name="end_time"]').value = formatForInput(now);
 
-            // Auto submit
             document.getElementById('filterForm').submit();
         }
 
-        // Convert all UTC timestamps to local time on load
         document.addEventListener('DOMContentLoaded', function () {
             document.querySelectorAll('.log-timestamp').forEach(function (el) {
                 const date = new Date(el.textContent);
                 if (!isNaN(date.getTime())) {
-                    // Customize format as needed, e.g., 'YYYY-MM-DD HH:mm:ss'
-                    // using toLocaleString() is the simplest way to get local format with timezone
-                    el.textContent = date.toLocaleString('sv-SE'); // sv-SE gives ISO-like YYYY-MM-DD HH:mm:ss format which is clean
+                    el.textContent = date.toLocaleString('sv-SE');
                 }
             });
         });
+        async function saveCurrentSearch() {
+            const name = prompt("Enter a name for this search:");
+            if (!name) return;
+
+            const queryObj = {
+                q: document.querySelector('input[name="q"]').value,
+                service: document.querySelector('input[name="service"]').value,
+                level: document.querySelector('select[name="level"]').value,
+                start_time: document.querySelector('input[name="start_time"]').value,
+                end_time: document.querySelector('input[name="end_time"]').value
+            };
+
+            try {
+                const response = await fetch('/searches', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: name, query: JSON.stringify(queryObj) })
+                });
+
+                if (response.ok) {
+                    alert("Search saved!");
+                    location.reload();
+                } else {
+                    const err = await response.json();
+                    alert("Error saving search: " + err.detail);
+                }
+            } catch (e) {
+                alert("Network error: " + e);
+            }
+        }
+
+        async function updateSelectedSearch() {
+            const select = document.getElementById('savedSearchSelect');
+            const searchId = select.value;
+            if (!searchId) {
+                alert("Please select a valid saved search to update.");
+                return;
+            }
+
+            const confirmUpdate = confirm("Update '" + select.options[select.selectedIndex].text + "' with current filter criteria?");
+            if (!confirmUpdate) return;
+
+            const queryObj = {
+                q: document.querySelector('input[name="q"]').value,
+                service: document.querySelector('input[name="service"]').value,
+                level: document.querySelector('select[name="level"]').value,
+                start_time: document.querySelector('input[name="start_time"]').value,
+                end_time: document.querySelector('input[name="end_time"]').value
+            };
+
+            try {
+                const response = await fetch('/searches/' + searchId, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query: JSON.stringify(queryObj) })
+                });
+
+                if (response.ok) {
+                    alert("Search updated!");
+                    location.reload();
+                } else {
+                    const err = await response.json();
+                    alert("Error updating search: " + err.detail);
+                }
+            } catch (e) {
+                alert("Network error: " + e);
+            }
+        }
+
+        async function deleteSelectedSearch() {
+            const select = document.getElementById('savedSearchSelect');
+            const searchId = select.value;
+            if (!searchId) {
+                alert("Please select a valid saved search to delete.");
+                return;
+            }
+
+            if (!confirm("Are you sure you want to delete this saved search?")) return;
+
+            try {
+                const response = await fetch('/searches/' + searchId, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    alert("Search deleted!");
+                    location.reload();
+                } else {
+                    const err = await response.json();
+                    alert("Error deleting search: " + err.detail);
+                }
+            } catch (e) {
+                alert("Network error: " + e);
+            }
+        }
+
+        function loadSavedSearch() {
+            const select = document.getElementById('savedSearchSelect');
+            const option = select.options[select.selectedIndex];
+            if (!option.value) return;
+
+            const queryData = JSON.parse(option.getAttribute('data-query'));
+            if (!queryData) return;
+
+            document.querySelector('input[name="q"]').value = queryData.q || "";
+            document.querySelector('input[name="service"]').value = queryData.service || "";
+            document.querySelector('select[name="level"]').value = queryData.level || "";
+            document.querySelector('input[name="start_time"]').value = queryData.start_time || "";
+            document.querySelector('input[name="end_time"]').value = queryData.end_time || "";
+
+            // Optional: Auto submit to see results immediately
+            document.getElementById('filterForm').submit();
+        }
     </script>
 </body>
 

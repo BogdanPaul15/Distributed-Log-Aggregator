@@ -7,6 +7,8 @@ import models, database, os, requests, json, csv, io, math
 from urllib.parse import quote
 from opensearchpy import OpenSearch
 import datetime
+from pydantic import BaseModel
+from typing import Optional, List
 
 app = FastAPI(title="Dashboard API")
 
@@ -47,35 +49,6 @@ client = OpenSearch(
     ssl_show_warn=False
 )
 
-def seed_logs():
-    """Seed some mock logs if none exist."""
-    try:
-        if not client.indices.exists(index="app-logs-*"):
-            print("Seeding mock logs...")
-            mock_logs = [
-                {"timestamp": "2025-11-28T10:00:01Z", "level": "INFO", "service": "payment-service", "message": "Transaction initiated for user 101"},
-                {"timestamp": "2025-11-28T10:00:02Z", "level": "DEBUG", "service": "payment-service", "message": "Validating currency EUR"},
-                {"timestamp": "2025-11-28T10:00:05Z", "level": "ERROR", "service": "checkout-service", "message": "Database connection timeout (5001ms)"},
-                {"timestamp": "2025-11-28T10:02:10Z", "level": "WARN", "service": "inventory-service", "message": "Stock low for item #5521"},
-                {"timestamp": "2025-11-28T10:05:00Z", "level": "INFO", "service": "auth-service", "message": "User testuser logged in successfully"},
-                {"timestamp": "2025-11-28T10:06:23Z", "level": "FATAL", "service": "payment-gateway", "message": "Payment provider API unreachable"},
-            ]
-            
-            dt = datetime.datetime.utcnow()
-            index_name = f"app-logs-{dt.strftime('%Y.%m.%d')}"
-            
-            for log in mock_logs:
-                client.index(index=index_name, body=log)
-            
-            client.indices.refresh(index=index_name)
-            print(f"Seeded {len(mock_logs)} logs to {index_name}")
-    except Exception as e:
-        print(f"Warning: Could not seed logs: {e}")
-
-@app.on_event("startup")
-async def startup_event():
-    seed_logs()
-
 def get_logs(role: str, page: int = 1, size: int = 10, search_query: str = None, service: str = None, level: str = None, start_time: str = None, end_time: str = None):
     must_conditions = []
     
@@ -109,16 +82,12 @@ def get_logs(role: str, page: int = 1, size: int = 10, search_query: str = None,
 
     timestamp_range = {}
     if start_time:
-        # If input has no timezone, assume local system time (which matches host via /etc/localtime)
-        # and convert/format to RFC3339 with offset for OpenSearch
+
         try:
-             # Parse naive string e.g., "2026-01-13T17:55"
             dt = datetime.datetime.fromisoformat(start_time)
-            # Make it aware using local timezone
             dt_aware = dt.astimezone() 
             timestamp_range["gte"] = dt_aware.isoformat()
         except ValueError:
-            # Fallback if parsing fails or already has tz
             timestamp_range["gte"] = start_time
 
     if end_time:
@@ -219,6 +188,11 @@ async def export_logs(
         print(f"Export Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+def get_saved_searches_helper(db, username, roles):
+    if "admin" in roles:
+        return db.query(models.SavedSearch).all()
+    return db.query(models.SavedSearch).filter(models.SavedSearch.username == username).all()
+
 @app.get("/", response_class=HTMLResponse)
 async def read_root(
     request: Request, 
@@ -285,7 +259,8 @@ async def read_root(
                 "service": service,
                 "level": level,
                 "start_time": start_time,
-                "end_time": end_time
+                "end_time": end_time,
+                "saved_searches": get_saved_searches_helper(db, username, kc_roles)
             })
         except Exception as e:
             print(f"Session restore failed: {e}")
@@ -378,3 +353,124 @@ async def callback(request: Request, code: str, db: Session = Depends(database.g
             "request": request, 
             "error": f"Login failed: {str(e)}"
         })
+
+# --- Saved Search API ---
+
+class SavedSearchBase(BaseModel):
+    name: str
+    query: str
+
+class SavedSearchCreate(SavedSearchBase):
+    pass
+
+class SavedSearchUpdate(BaseModel):
+    name: Optional[str] = None
+    query: Optional[str] = None
+
+class SavedSearchResponse(SavedSearchBase):
+    id: int
+    username: str
+    created_at: datetime.datetime
+    updated_at: datetime.datetime
+
+    class Config:
+        orm_mode = True
+
+def get_current_user_from_token(request: Request):
+    """Helper to extract user info from token in cookies"""
+    token = request.cookies.get("access_token") or request.cookies.get("id_token")
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    try:
+        decoded = jwt.decode(token, None, options={"verify_signature": False, "verify_aud": False})
+        return {
+            "username": decoded.get("preferred_username"),
+            "roles": decoded.get("realm_access", {}).get("roles", [])
+        }
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+@app.post("/searches", response_model=SavedSearchResponse)
+async def create_saved_search(
+    search: SavedSearchCreate,
+    request: Request,
+    db: Session = Depends(database.get_db)
+):
+    user_info = get_current_user_from_token(request)
+    username = user_info["username"]
+
+    db_search = models.SavedSearch(
+        name=search.name,
+        query=search.query,
+        username=username
+    )
+    db.add(db_search)
+    db.commit()
+    db.refresh(db_search)
+    return db_search
+
+@app.get("/searches", response_model=List[SavedSearchResponse])
+async def list_saved_searches(
+    request: Request,
+    db: Session = Depends(database.get_db)
+):
+    user_info = get_current_user_from_token(request)
+    username = user_info["username"]
+    roles = user_info["roles"]
+
+    if "admin" in roles:
+        # Admins see all searches
+        return db.query(models.SavedSearch).all()
+    else:
+        # Viewers and developers see only their own searches
+        return db.query(models.SavedSearch).filter(models.SavedSearch.username == username).all()
+
+@app.put("/searches/{search_id}", response_model=SavedSearchResponse)
+async def update_saved_search(
+    search_id: int,
+    search_update: SavedSearchUpdate,
+    request: Request,
+    db: Session = Depends(database.get_db)
+):
+    user_info = get_current_user_from_token(request)
+    username = user_info["username"]
+    roles = user_info["roles"]
+
+    db_search = db.query(models.SavedSearch).filter(models.SavedSearch.id == search_id).first()
+    if not db_search:
+        raise HTTPException(status_code=404, detail="Saved search not found")
+
+    # Access control: Owner or Admin
+    if db_search.username != username and "admin" not in roles:
+        raise HTTPException(status_code=403, detail="Not authorized to update this search")
+
+    if search_update.name is not None:
+        db_search.name = search_update.name
+    if search_update.query is not None:
+        db_search.query = search_update.query
+
+    db.commit()
+    db.refresh(db_search)
+    return db_search
+
+@app.delete("/searches/{search_id}")
+async def delete_saved_search(
+    search_id: int,
+    request: Request,
+    db: Session = Depends(database.get_db)
+):
+    user_info = get_current_user_from_token(request)
+    username = user_info["username"]
+    roles = user_info["roles"]
+
+    db_search = db.query(models.SavedSearch).filter(models.SavedSearch.id == search_id).first()
+    if not db_search:
+        raise HTTPException(status_code=404, detail="Saved search not found")
+
+    # Access control: Owner or Admin
+    if db_search.username != username and "admin" not in roles:
+        raise HTTPException(status_code=403, detail="Not authorized to delete this search")
+
+    db.delete(db_search)
+    db.commit()
+    return {"detail": "Saved search deleted successfully"}

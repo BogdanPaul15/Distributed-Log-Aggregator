@@ -1,0 +1,72 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  test-go:
+    name: Test & Lint Go Services
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [log-ingestor, log-generator, log-consumer]
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+          cache-dependency-path: ${{ matrix.service }}/go.sum
+          
+      - name: Vet
+        working-directory: ./${{ matrix.service }}
+        run: go vet ./...
+        
+      - name: Test
+        working-directory: ./${{ matrix.service }}
+        run: go test -v ./...
+
+  lint-python:
+    name: Lint Python Service
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+          
+      - name: Install flake8
+        run: pip install flake8
+        
+      - name: Lint with flake8
+        working-directory: ./dashboard_service
+        run: |
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+  verify-docker:
+    name: Verify Docker Builds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate docker-compose.yml
+        run: docker compose config --quiet
+
+      - name: Build log-ingestor image
+        run: docker build -t log-ingestor:test ./log-ingestor
+
+      - name: Build log-generator image
+        run: docker build -t log-generator:test ./log-generator
+
+      - name: Build log-consumer image
+        run: docker build -t log-consumer:test ./log-consumer
+
+      - name: Build dashboard-service image
+        run: docker build -t dashboard-service:test ./dashboard_service

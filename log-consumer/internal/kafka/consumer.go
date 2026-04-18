@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"log-consumer/internal/model"
-	"log-consumer/internal/storage"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -25,12 +24,26 @@ var (
 	})
 )
 
-type Consumer struct {
-	reader  *kafka.Reader
-	storage *storage.OpenSearchClient
+type MessageReader interface {
+	FetchMessage(ctx context.Context) (kafka.Message, error)
+	CommitMessages(ctx context.Context, msgs ...kafka.Message) error
+	Stats() kafka.ReaderStats
+	Close() error
 }
 
-func NewConsumer(brokers []string, topic string, groupID string, storage *storage.OpenSearchClient) *Consumer {
+type LogStorage interface {
+	IndexBatch(ctx context.Context, logs []model.LogEvent) error
+}
+
+type Consumer struct {
+	reader  MessageReader
+	storage LogStorage
+}
+
+// Ensure the real kafka reader implements MessageReader
+var _ MessageReader = (*kafka.Reader)(nil)
+
+func NewConsumer(brokers []string, topic string, groupID string, storage LogStorage) *Consumer {
 	r := kafka.NewReader(kafka.ReaderConfig{
 		Brokers:  brokers,
 		Topic:    topic,
@@ -41,6 +54,14 @@ func NewConsumer(brokers []string, topic string, groupID string, storage *storag
 
 	return &Consumer{
 		reader:  r,
+		storage: storage,
+	}
+}
+
+// NewConsumerWithDeps allows injecting custom reader and storage (e.g. for testing)
+func NewConsumerWithDeps(reader MessageReader, storage LogStorage) *Consumer {
+	return &Consumer{
+		reader:  reader,
 		storage: storage,
 	}
 }

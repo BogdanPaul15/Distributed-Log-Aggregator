@@ -1,0 +1,64 @@
+_format_version: "3.0"
+_transform: true
+
+services:
+  # Dashboard API (catch-all, lowest priority — serves the main UI)
+  - name: dashboard-backend
+    url: http://dashboard-backend:8000
+    routes:
+      - name: dashboard-route
+        paths:
+          - /
+        strip_path: false
+        preserve_host: true
+        regex_priority: 0
+
+  # Keycloak Auth
+  - name: keycloak
+    url: http://keycloak:8080
+    routes:
+      - name: keycloak-route
+        paths:
+          - /auth
+        strip_path: false
+        preserve_host: true
+
+  # Grafana
+  - name: grafana
+    url: http://grafana:3000
+    routes:
+      - name: grafana-route
+        paths:
+          - /grafana
+        strip_path: false
+        preserve_host: true
+
+  # Kafka UI
+  - name: kafka-ui
+    url: http://kafka-ui:8080
+    routes:
+      - name: kafka-ui-route
+        paths:
+          - /kafka-ui
+        strip_path: false
+        preserve_host: true
+
+  # OpenSearch Dashboards
+  - name: opensearch-dashboards
+    url: http://opensearch-dashboards:5601
+    routes:
+      - name: opensearch-dashboards-route
+        paths:
+          - /opensearch
+        strip_path: false
+        preserve_host: true
+
+  # Portainer
+  - name: portainer
+    url: http://portainer:9000
+    routes:
+      - name: portainer-route
+        paths:
+          - /portainer
+        strip_path: true
+        preserve_host: true

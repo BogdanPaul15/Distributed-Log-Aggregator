@@ -39,9 +39,12 @@ echo "Networks cleaned."
 echo "Removing persistent volumes (Database & Logs)..."
 docker volume rm log_stack_db_data log_stack_opensearch_data log_stack_kafka_data_1 log_stack_kafka_data_2 log_stack_kafka_data_3 log_stack_zookeeper_data log_stack_zookeeper_log || echo "Volumes might already be removed or named differently."
 
-# 4. Rebuild the images to ensure latest code is used
+# 4. Rebuild the images to ensure latest code is used (using docker build directly to avoid compose labels)
 echo "Building services..."
-docker compose build
+docker build -t dashboard-service:v1 ./dashboard_service
+docker build -t log-ingestor:latest ./log-ingestor
+docker build -t log-generator:latest ./log-generator
+docker build -t log-consumer:latest ./log-consumer
 
 # 5. Deploy the stack fresh
 echo "Deploying the stack..."

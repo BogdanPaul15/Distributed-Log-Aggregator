@@ -14,10 +14,10 @@ import (
 )
 
 type Server struct {
-	producer *kafka.Producer
+	producer kafka.ProducerInterface
 }
 
-func NewServer(producer *kafka.Producer) *Server {
+func NewServer(producer kafka.ProducerInterface) *Server {
 	return &Server{
 		producer: producer,
 	}

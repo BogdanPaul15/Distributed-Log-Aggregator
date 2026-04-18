@@ -9,6 +9,12 @@ import (
 	"log-ingestor/internal/model"
 )
 
+type ProducerInterface interface {
+	Produce(ctx context.Context, event model.LogEvent) error
+	ProduceBatch(ctx context.Context, events []model.LogEvent) error
+	Close() error
+}
+
 type Producer struct {
 	writer *kafka.Writer
 }

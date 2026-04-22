@@ -4,7 +4,7 @@ The system is delivered as a **Docker Swarm** stack organized into functional la
 Communication between services is handled through isolated overlay networks, and
 data persistence is ensured through Docker volumes.
 
-![image](./documentation/scd.png)
+![image](./documentation/architecture.png)
 
 | Network Zone | Color |
 | :--- | :--- |

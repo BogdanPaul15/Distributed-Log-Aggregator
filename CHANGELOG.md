@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Test the application on a real cluster with one manager and two worker nodes.
 
-## [1.2.0] - 2026-04-22
+## [1.2.0]
 
 ### Added
 - Comprehensive unit tests with mocks for all Go microservices (`log-ingestor`, `log-consumer`, `log-generator`).
@@ -26,7 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed bug where Viewer accounts could see restricted log levels.
 - Fixed dashboard auto-submission issue when loading custom queries.
 
-## [1.1.0] - 2026-04-18
+## [1.1.0]
 
 ### Added
 - Integrated Kong API Gateway for secure and centralized routing.
@@ -39,7 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Divide infrastructure into isolated overlay networks (`public_net`, `stream_net`, `data_net`, `monitoring_net`).
 - Upgraded **Log Generator** to support dynamic rate and level weight updates via REST API.
 
-## [1.0.0] - 2026-04-10
+## [1.0.0]
 
 ### Added
 - Initial release of the Distributed Log Aggregator.

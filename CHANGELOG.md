@@ -1,7 +1,10 @@
 # Changelog
 
-Author: Prisacaru Bogdan-Paul 343 C4 <br>
+Author: Prisacaru Bogdan-Paul 343 C4
+
 Asistent: Florin Mihalache (Miercuri 08:00-10:00)
+
+Repository: https://github.com/BogdanPaul15/Distributed-Log-Aggregator
 
 **Distributed Log Aggregator** is a log management system that collects, processes, and stores logs from various sources.
 
@@ -10,10 +13,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.3.0]
 
 ### Added
-- Test the application on a real cluster with one manager and two worker nodes.
+- Test the application on a Docker Swarm cluster with one manager and two worker nodes.
 
 ## [1.2.0]
 
@@ -37,17 +40,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Divide infrastructure into isolated overlay networks (`public_net`, `stream_net`, `data_net`, `monitoring_net`).
-- Upgraded **Log Generator** to support dynamic rate and level weight updates via REST API.
+- Upgraded Log Generator to support dynamic rate and level weight updates via REST API.
 
 ## [1.0.0]
 
 ### Added
 - Initial release of the Distributed Log Aggregator.
-- High-throughput **Log Ingestor** service in Go.
-- **Log Consumer** service with Kafka-to-OpenSearch bulk indexing.
-- Custom **Log Generator** service in Go.
+- High-throughput Log Ingestor service in Go.
+- Log Consumer service with Kafka-to-OpenSearch bulk indexing.
+- Custom Log Generator service in Go.
 - Authentication and authorization using Keycloak SSO.
-- **Dashboard Service** (FastAPI) for log search, filtering, and export.
+- Dashboard Service (FastAPI) for log search, filtering, and export.
 - 3-broker Kafka cluster with Zookeeper and Kafka-UI.
 - OpenSearch and OpenSearch Dashboards for data storage and analysis.
 - Monitoring stack with Prometheus, Grafana, and cAdvisor.

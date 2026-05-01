@@ -10,8 +10,11 @@ scrape_configs:
         port: 8080
 
   - job_name: 'log-generator'
-    static_configs:
-      - targets: ['log-generator:8081']
+    dns_sd_configs:
+      - names:
+          - 'tasks.log-generator'
+        type: 'A'
+        port: 8081
 
   - job_name: 'log-consumer'
     dns_sd_configs:
@@ -22,5 +25,8 @@ scrape_configs:
 
   - job_name: 'cadvisor'
     scrape_interval: 5s
-    static_configs:
-      - targets: ['cadvisor:8080']
+    dns_sd_configs:
+      - names:
+          - 'tasks.cadvisor'
+        type: 'A'
+        port: 8080

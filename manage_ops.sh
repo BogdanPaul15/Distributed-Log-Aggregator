@@ -1,5 +1,5 @@
 #!/bin/bash
-
+export DOCKER_HOST=tcp://127.0.0.1:2375
 STACK_NAME="log_stack"
 GENERATOR_URL="http://localhost:8081"
 

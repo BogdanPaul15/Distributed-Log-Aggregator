@@ -1,5 +1,4 @@
 services:
-  # Infrastructure: Zookeeper & Kafka
   zookeeper:
     image: confluentinc/cp-zookeeper:7.3.0
     environment:
@@ -7,6 +6,7 @@ services:
       ZOOKEEPER_TICK_TIME: 2000
     ports:
       - "2181:2181"
+    deploy:
     volumes:
       - zookeeper_data:/var/lib/zookeeper/data
       - zookeeper_log:/var/lib/zookeeper/log
@@ -15,8 +15,6 @@ services:
 
   kafka-1:
     image: confluentinc/cp-kafka:7.3.0
-    depends_on:
-      - zookeeper
     ports:
       - "9092:9092"
     environment:
@@ -48,8 +46,6 @@ services:
 
   kafka-2:
     image: confluentinc/cp-kafka:7.3.0
-    depends_on:
-      - zookeeper
     ports:
       - "9093:9093"
     environment:
@@ -65,8 +61,6 @@ services:
       KAFKA_MIN_INSYNC_REPLICAS: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
       KAFKA_HEAP_OPTS: "-Xms512M -Xmx512M"
-    deploy:
-      replicas: 1
     command:
       - bash
       - -c
@@ -74,6 +68,8 @@ services:
         echo "Waiting for Zookeeper..."
         while ! (echo > /dev/tcp/zookeeper/2181) >/dev/null 2>&1; do sleep 2; done
         /etc/confluent/docker/run
+    deploy:
+      replicas: 1
     volumes:
       - kafka_data_2:/var/lib/kafka/data
     networks:
@@ -81,13 +77,12 @@ services:
 
   kafka-3:
     image: confluentinc/cp-kafka:7.3.0
-    depends_on:
-      - zookeeper
     ports:
       - "9094:9094"
     environment:
       KAFKA_BROKER_ID: 3
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29094,PLAINTEXT_HOST://0.0.0.0:9094
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-3:29094,PLAINTEXT_HOST://localhost:9094
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
@@ -97,8 +92,6 @@ services:
       KAFKA_MIN_INSYNC_REPLICAS: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
       KAFKA_HEAP_OPTS: "-Xms512M -Xmx512M"
-    deploy:
-      replicas: 1
     command:
       - bash
       - -c
@@ -106,6 +99,8 @@ services:
         echo "Waiting for Zookeeper..."
         while ! (echo > /dev/tcp/zookeeper/2181) >/dev/null 2>&1; do sleep 2; done
         /etc/confluent/docker/run
+    deploy:
+      replicas: 1
     volumes:
       - kafka_data_3:/var/lib/kafka/data
     networks:
@@ -113,19 +108,22 @@ services:
 
   init-kafka:
     image: confluentinc/cp-kafka:7.3.0
-    depends_on:
-      - kafka-1
-      - kafka-2
-      - kafka-3
-    entrypoint: [ '/bin/sh', '-c' ]
+    entrypoint: ['/bin/sh', '-c']
     command: |
       "
       echo 'Waiting for ALL brokers to be online...'
-      until nc -z kafka-1 29092 && nc -z kafka-2 29093 && nc -z kafka-3 29094; do
-        sleep 5
+      until kafka-topics --bootstrap-server kafka-1:29092 --list > /dev/null 2>&1; do
+        echo 'Waiting for kafka-1...'; sleep 5
       done
-      echo 'Creating topics...'
+      until kafka-topics --bootstrap-server kafka-2:29093 --list > /dev/null 2>&1; do
+        echo 'Waiting for kafka-2...'; sleep 5
+      done
+      until kafka-topics --bootstrap-server kafka-3:29094 --list > /dev/null 2>&1; do
+        echo 'Waiting for kafka-3...'; sleep 5
+      done
+      echo 'All brokers ready. Creating topics...'
       kafka-topics --bootstrap-server kafka-1:29092 --create --if-not-exists --topic logs --replication-factor 3 --partitions 5
+      echo 'Topics created!'
       "
     networks:
       - stream_net
@@ -142,15 +140,10 @@ services:
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka-1:29092,kafka-2:29093,kafka-3:29094
       KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
       SERVER_SERVLET_CONTEXT_PATH: /kafka-ui
-    depends_on:
-      - zookeeper
-      - kafka-1
-      - kafka-2
-      - kafka-3
+    deploy:
     networks:
       - stream_net
 
-  # Database & Auth
   postgres:
     image: postgres:15
     environment:
@@ -181,12 +174,8 @@ services:
       - public_net
       - data_net
 
-  # Dashboard API (Python)
   dashboard-backend:
-    build: ./dashboard_service
-    image: dashboard-service:v1
-    volumes:
-      - /etc/localtime:/etc/localtime:ro
+    image: bogdanpaul15/dashboard-service:v1
     environment:
       DATABASE_URL: postgresql://admin:password@postgres:5432/log_platform_db
       KEYCLOAK_URL: http://keycloak:8080/auth/realms/log-realm
@@ -196,64 +185,56 @@ services:
       OPENSEARCH_PORT: 9200
     ports:
       - "8000:8000"
-    depends_on:
-      - postgres
-      - keycloak
-      - opensearch
     deploy:
       replicas: 1
     networks:
       - public_net
       - data_net
 
-  # Go Services (Generator, Ingestor, Consumer)
   log-ingestor:
-    build: ./log-ingestor
-    image: log-ingestor:latest
+    image: bogdanpaul15/log-ingestor:latest
     deploy:
       replicas: 2
     environment:
       - KAFKA_BROKERS=kafka-1:29092,kafka-2:29093,kafka-3:29094
       - KAFKA_TOPIC=logs
       - SERVER_ADDR=:8080
-    depends_on:
-      - init-kafka
-    command: 
+    command:
       - sh
       - -c
       - |
         echo "Waiting for Kafka..."
-        until nc -z kafka-1 29092; do sleep 2; done
+        until nc -z kafka-1 29092 2>/dev/null; do
+          echo "Kafka not ready, retrying in 5s..."
+          sleep 5
+        done
         echo "Kafka is up!"
         ./log-ingestor
     networks:
       - stream_net
+      - public_net
 
   log-generator:
-    build: ./log-generator
-    image: log-generator:latest
+    image: bogdanpaul15/log-generator:latest
     ports:
       - "8081:8081"
     volumes:
       - ./log-generator/config.docker.yaml:/app/config.yaml
-      - /etc/localtime:/etc/localtime:ro
-    depends_on:
-      - log-ingestor
-    command: 
+    deploy:
+    command:
       - sh
-      - -c 
+      - -c
       - |
-        echo "Waiting for Log Ingestor..."
-        until nc -z log-ingestor 8080; do sleep 2; done
-        echo "Log Ingestor is up!"
-        ./log-generator
+        echo "Waiting 60s for log-ingestor to start..."
+        sleep 60
+        echo "Starting log-generator..."
+        exec ./log-generator
     networks:
       - public_net
       - stream_net
 
   log-consumer:
-    build: ./log-consumer
-    image: log-consumer:latest
+    image: bogdanpaul15/log-consumer:latest
     deploy:
       replicas: 2
     environment:
@@ -261,25 +242,26 @@ services:
       - KAFKA_TOPIC=logs
       - KAFKA_GROUP_ID=log-consumer-group
       - OPENSEARCH_ADDR=http://opensearch:9200
-    depends_on:
-      - init-kafka
-      - opensearch
-    command: 
+    command:
       - sh
-      - -c 
+      - -c
       - |
-        echo "Waiting for Kafka..."
-        until nc -z kafka-1 29092; do sleep 2; done
-        echo "Kafka is up!"
+        echo "Waiting for all Kafka brokers..."
+        until nc -z kafka-1 29092 2>/dev/null && nc -z kafka-2 29093 2>/dev/null && nc -z kafka-3 29094 2>/dev/null; do
+          echo "Kafka not ready, retrying in 5s..."
+          sleep 5
+        done
         echo "Waiting for OpenSearch..."
-        until nc -z opensearch 9200; do sleep 2; done
-        echo "OpenSearch is up!"
+        until nc -z opensearch 9200 2>/dev/null; do
+          echo "OpenSearch not ready, retrying in 5s..."
+          sleep 5
+        done
+        echo "All dependencies up!"
         ./log-consumer
     networks:
       - data_net
       - stream_net
 
-  # Storage & Visualization
   opensearch:
     image: opensearchproject/opensearch:2.11.0
     environment:
@@ -287,6 +269,8 @@ services:
       - bootstrap.memory_lock=true
       - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
       - DISABLE_SECURITY_PLUGIN=true
+    deploy:
+      replicas: 1
     ulimits:
       memlock:
         soft: -1
@@ -313,8 +297,8 @@ services:
       DISABLE_SECURITY_DASHBOARDS_PLUGIN: "true"
       SERVER_BASEPATH: "/opensearch"
       SERVER_REWRITEBASEPATH: "true"
-    depends_on:
-      - opensearch
+    deploy:
+      replicas: 1
     networks:
       - data_net
       - public_net
@@ -325,8 +309,7 @@ services:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
     ports:
       - "9090:9090"
-    depends_on:
-      - log-ingestor
+    deploy:
     networks:
       - stream_net
       - monitoring_net
@@ -341,8 +324,7 @@ services:
       GF_SERVER_SERVE_FROM_SUB_PATH: "true"
     volumes:
       - ./grafana/provisioning:/etc/grafana/provisioning
-    depends_on:
-      - prometheus
+    deploy:
     networks:
       - public_net
       - monitoring_net
@@ -354,25 +336,38 @@ services:
     volumes:
       - /:/rootfs:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - /var/run/containerd/containerd.sock:/var/run/containerd/containerd.sock:ro
       - /sys:/sys:ro
       - /var/lib/docker/:/var/lib/docker:ro
-      - /dev/disk/:/dev/disk:ro
+    deploy:
+      mode: global
     networks:
       - monitoring_net
 
+  agent:
+    image: portainer/agent:latest
+    environment:
+      AGENT_CLUSTER_ADDR: tasks.agent
+    ports:
+      - target: 9001
+        published: 9001
+        protocol: tcp
+        mode: host
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/lib/docker/volumes:/var/lib/docker/volumes
+    networks:
+      - monitoring_net
+    deploy:
+      mode: global
   portainer:
     image: portainer/portainer-ce:lts
+    command: -H tcp://tasks.agent:9001 --tlsskipverify
     ports:
       - "9443:9443"
       - "9000:9000"
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
       - portainer_data:/data
     deploy:
-      placement:
-        constraints:
-          - node.role == manager
     networks:
       - monitoring_net
 
@@ -406,12 +401,16 @@ services:
 networks:
   public_net:
     driver: overlay
+    attachable: true
   data_net:
     driver: overlay
+    attachable: true
   stream_net:
     driver: overlay
+    attachable: true
   monitoring_net:
     driver: overlay
+    attachable: true
 
 volumes:
   zookeeper_data:

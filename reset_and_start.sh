@@ -1,6 +1,6 @@
 #!/bin/bash
 set -e
-
+export DOCKER_HOST=tcp://127.0.0.1:2375
 # 0. Ensure Docker Swarm is initialized
 if [ "$(docker info --format '{{.Swarm.LocalNodeState}}')" != "active" ]; then
     echo "Docker Swarm is not initialized. Initializing..."

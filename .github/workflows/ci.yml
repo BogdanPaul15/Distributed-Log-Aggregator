@@ -121,5 +121,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Refresh Swarm cluster
+        run: |
+          bash teardown_swarm_cluster.sh || true
+          bash setup_swarm_cluster.sh
+
       - name: Deploy stack
         run: bash reset_and_start.sh

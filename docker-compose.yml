@@ -185,6 +185,17 @@ services:
       OPENSEARCH_PORT: 9200
     ports:
       - "8000:8000"
+    command:
+      - sh
+      - -c
+      - |
+        echo "Waiting for PostgreSQL..."
+        until (echo > /dev/tcp/postgres/5432) >/dev/null 2>&1; do
+          echo "PostgreSQL not ready, retrying in 2s..."
+          sleep 2
+        done
+        echo "PostgreSQL is up!"
+        uvicorn main:app --host 0.0.0.0 --port 8000
     deploy:
       replicas: 1
     networks:

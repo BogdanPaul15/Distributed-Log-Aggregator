@@ -112,3 +112,14 @@ jobs:
           context: ./dashboard_service
           push: true
           tags: bogdanpaul15/dashboard-service:v1
+
+  deploy:
+    name: Deploy to Local Swarm
+    needs: publish
+    runs-on: self-hosted
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy stack
+        run: bash reset_and_start.sh

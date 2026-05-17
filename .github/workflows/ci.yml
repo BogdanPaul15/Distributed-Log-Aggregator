@@ -70,3 +70,45 @@ jobs:
 
       - name: Build dashboard-service image
         run: docker build -t dashboard-service:test ./dashboard_service
+  
+  publish:
+    name: Publish Docker Images
+    needs: [test-go, lint-python, verify-docker]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push log-ingestor
+        uses: docker/build-push-action@v5
+        with:
+          context: ./log-ingestor
+          push: true
+          tags: bogdanpaul15/log-ingestor:latest
+
+      - name: Build and push log-generator
+        uses: docker/build-push-action@v5
+        with:
+          context: ./log-generator
+          push: true
+          tags: bogdanpaul15/log-generator:latest
+
+      - name: Build and push log-consumer
+        uses: docker/build-push-action@v5
+        with:
+          context: ./log-consumer
+          push: true
+          tags: bogdanpaul15/log-consumer:latest
+
+      - name: Build and push dashboard-service
+        uses: docker/build-push-action@v5
+        with:
+          context: ./dashboard_service
+          push: true
+          tags: bogdanpaul15/dashboard-service:v1

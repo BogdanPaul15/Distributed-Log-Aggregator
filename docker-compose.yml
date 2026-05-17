@@ -164,8 +164,9 @@ services:
       KEYCLOAK_ADMIN: admin
       KEYCLOAK_ADMIN_PASSWORD: admin
       KC_HTTP_RELATIVE_PATH: /auth
-    volumes:
-      - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json
+    configs:
+      - source: keycloak_realm
+        target: /opt/keycloak/data/import/realm-export.json
     ports:
       - "8080:8080"
     deploy:
@@ -186,7 +187,7 @@ services:
     ports:
       - "8000:8000"
     command:
-      - sh
+      - bash
       - -c
       - |
         echo "Waiting for PostgreSQL..."
@@ -229,8 +230,9 @@ services:
     image: bogdanpaul15/log-generator:latest
     ports:
       - "8081:8081"
-    volumes:
-      - ./log-generator/config.docker.yaml:/app/config.yaml
+    configs:
+      - source: log_generator_config
+        target: /app/config.yaml
     deploy:
     command:
       - sh
@@ -316,8 +318,9 @@ services:
 
   prometheus:
     image: prom/prometheus:latest
-    volumes:
-      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    configs:
+      - source: prometheus_config
+        target: /etc/prometheus/prometheus.yml
     ports:
       - "9090:9090"
     deploy:
@@ -333,8 +336,19 @@ services:
       GF_SERVER_DOMAIN: "localhost"
       GF_SERVER_ROOT_URL: "http://localhost:8100/grafana/"
       GF_SERVER_SERVE_FROM_SUB_PATH: "true"
-    volumes:
-      - ./grafana/provisioning:/etc/grafana/provisioning
+    configs:
+      - source: grafana_datasource
+        target: /etc/grafana/provisioning/datasources/datasource.yml
+      - source: grafana_dashboard_config
+        target: /etc/grafana/provisioning/dashboards/dashboard.yml
+      - source: grafana_dashboard_consumer
+        target: /etc/grafana/provisioning/dashboards/log_consumer_dashboard.json
+      - source: grafana_dashboard_generator
+        target: /etc/grafana/provisioning/dashboards/log_generator_dashboard.json
+      - source: grafana_dashboard_ingestor
+        target: /etc/grafana/provisioning/dashboards/log_ingestor_dashboard.json
+      - source: grafana_dashboard_system
+        target: /etc/grafana/provisioning/dashboards/system_dashboard.json
     deploy:
     networks:
       - public_net
@@ -394,8 +408,10 @@ services:
       KONG_ADMIN_ACCESS_LOG: /dev/stdout
       KONG_PROXY_ERROR_LOG: /dev/stderr
       KONG_ADMIN_ERROR_LOG: /dev/stderr
+    configs:
+      - source: kong_config
+        target: /etc/kong/kong.yml
     volumes:
-      - ./kong/kong.yml:/etc/kong/kong.yml:ro
       - kong_data:/usr/local/kong
       - kong_tmp:/tmp
     ports:
@@ -434,3 +450,25 @@ volumes:
   portainer_data:
   kong_data:
   kong_tmp:
+
+configs:
+  kong_config:
+    file: ./kong/kong.yml
+  prometheus_config:
+    file: ./prometheus/prometheus.yml
+  keycloak_realm:
+    file: ./keycloak/realm-export.json
+  log_generator_config:
+    file: ./log-generator/config.docker.yaml
+  grafana_datasource:
+    file: ./grafana/provisioning/datasources/datasource.yml
+  grafana_dashboard_config:
+    file: ./grafana/provisioning/dashboards/dashboard.yml
+  grafana_dashboard_consumer:
+    file: ./grafana/provisioning/dashboards/log_consumer_dashboard.json
+  grafana_dashboard_generator:
+    file: ./grafana/provisioning/dashboards/log_generator_dashboard.json
+  grafana_dashboard_ingestor:
+    file: ./grafana/provisioning/dashboards/log_ingestor_dashboard.json
+  grafana_dashboard_system:
+    file: ./grafana/provisioning/dashboards/system_dashboard.json
